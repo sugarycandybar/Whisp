@@ -1,0 +1,534 @@
+#!@PYTHON@
+import gi
+import os
+import re
+import uuid
+import sys
+import json
+import shutil
+from pathlib import Path
+
+
+gi.require_version('Gtk', '4.0')
+gi.require_version('Adw', '1')
+from gi.repository import Gtk, Adw, GLib, Pango, Gio, Gdk
+
+# Data directory configuration
+CONFIG_DIR = Path.home() / ".config" / "nota"
+CONFIG_FILE = CONFIG_DIR / "config.json"
+
+class Config:
+    def __init__(self):
+        self.data = {"data_dir": str(Path.home() / ".local" / "share" / "nota" / "notes")}
+        self.load()
+
+    def load(self):
+        if CONFIG_FILE.exists():
+            try:
+                self.data.update(json.loads(CONFIG_FILE.read_text()))
+            except:
+                pass
+        else:
+            CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+            self.save()
+
+    def save(self):
+        CONFIG_FILE.write_text(json.dumps(self.data))
+
+    @property
+    def data_dir(self):
+        return Path(self.data["data_dir"])
+
+    @data_dir.setter
+    def data_dir(self, value):
+        self.data["data_dir"] = str(value)
+        self.save()
+
+config = Config()
+DATA_DIR = config.data_dir
+TRASH_DIR = DATA_DIR.parent / ".trash"
+
+
+class MarkdownHighlighter:
+    def __init__(self, buffer):
+        self.buffer = buffer
+        self.create_tags()
+        self.buffer.connect("changed", self.on_changed)
+        # Timeout ID for debouncing
+        self.timeout_id = 0
+
+    def create_tags(self):
+        # Headings
+        self.tag_h1 = self.buffer.create_tag("h1", weight=Pango.Weight.BOLD, scale=2.0)
+        self.tag_h2 = self.buffer.create_tag("h2", weight=Pango.Weight.BOLD, scale=1.5)
+        self.tag_h3 = self.buffer.create_tag("h3", weight=Pango.Weight.BOLD, scale=1.25)
+        
+        # Bold and Italic
+        self.tag_bold = self.buffer.create_tag("bold", weight=Pango.Weight.BOLD)
+        self.tag_italic = self.buffer.create_tag("italic", style=Pango.Style.ITALIC)
+        self.tag_underline = self.buffer.create_tag("underline", underline=Pango.Underline.SINGLE)
+        
+        # Monospace / Code
+        self.tag_code = self.buffer.create_tag("code", family="monospace", background="#2a2a2a")
+        
+        # Bullet points
+        self.tag_bullet = self.buffer.create_tag("bullet", indent=-15, left_margin=30)
+        self.tag_bullet_bold = self.buffer.create_tag("bullet_bold", weight=Pango.Weight.BOLD)
+
+    def on_changed(self, buffer):
+        if self.timeout_id:
+            GLib.source_remove(self.timeout_id)
+        self.timeout_id = GLib.timeout_add(300, self.highlight)
+
+    def highlight(self):
+        self.timeout_id = 0
+        start, end = self.buffer.get_bounds()
+        text = self.buffer.get_text(start, end, True)
+        
+        # Remove all formatting tags first
+        self.buffer.remove_all_tags(start, end)
+        
+        # Apply headings (e.g. # Heading)
+        for m in re.finditer(r'^(#{1,3})\s+(.*)$', text, re.MULTILINE):
+            level = len(m.group(1))
+            tag = self.tag_h1 if level == 1 else (self.tag_h2 if level == 2 else self.tag_h3)
+            start_iter = self.buffer.get_iter_at_offset(m.start())
+            end_iter = self.buffer.get_iter_at_offset(m.end())
+            self.buffer.apply_tag(tag, start_iter, end_iter)
+            
+        # Apply bullet points (- item or * item) and numbered lists (1. item)
+        for m in re.finditer(r'^(\s*(?:[-*+]|\d+\.)\s+)(.*)$', text, re.MULTILINE):
+            start_iter = self.buffer.get_iter_at_offset(m.start())
+            end_iter = self.buffer.get_iter_at_offset(m.end())
+            self.buffer.apply_tag(self.tag_bullet, start_iter, end_iter)
+            # Make the bullet character bold
+            bullet_end_iter = self.buffer.get_iter_at_offset(m.start() + len(m.group(1)))
+            self.buffer.apply_tag(self.tag_bullet_bold, start_iter, bullet_end_iter)
+            
+        # Apply bold (**text**)
+        for m in re.finditer(r'\*\*(.*?)\*\*', text):
+            start_iter = self.buffer.get_iter_at_offset(m.start())
+            end_iter = self.buffer.get_iter_at_offset(m.end())
+            self.buffer.apply_tag(self.tag_bold, start_iter, end_iter)
+            
+        # Apply italic (*text*)
+        for m in re.finditer(r'\*(.*?)\*', text):
+            if m.group().startswith('**'): continue
+            start_iter = self.buffer.get_iter_at_offset(m.start())
+            end_iter = self.buffer.get_iter_at_offset(m.end())
+            self.buffer.apply_tag(self.tag_italic, start_iter, end_iter)
+            
+        # Apply underline (<u>text</u>)
+        for m in re.finditer(r'<u>(.*?)</u>', text):
+            start_iter = self.buffer.get_iter_at_offset(m.start())
+            end_iter = self.buffer.get_iter_at_offset(m.end())
+            self.buffer.apply_tag(self.tag_underline, start_iter, end_iter)
+
+        # Apply code (`text`)
+        for m in re.finditer(r'`(.*?)`', text):
+            start_iter = self.buffer.get_iter_at_offset(m.start())
+            end_iter = self.buffer.get_iter_at_offset(m.end())
+            self.buffer.apply_tag(self.tag_code, start_iter, end_iter)
+            
+        return False
+
+
+class NoteEditor(Gtk.ScrolledWindow):
+    def __init__(self, file_path=None, on_title_changed=None):
+        super().__init__()
+        self.set_hexpand(True)
+        self.set_vexpand(True)
+        
+        self.file_path = Path(file_path) if file_path else DATA_DIR / f"{uuid.uuid4().hex}.md"
+        self.on_title_changed = on_title_changed
+        
+        self.textview = Gtk.TextView()
+        self.textview.set_wrap_mode(Gtk.WrapMode.WORD_CHAR)
+        self.textview.set_left_margin(16)
+        self.textview.set_right_margin(16)
+        self.textview.set_top_margin(16)
+        self.textview.set_bottom_margin(16)
+        self.set_child(self.textview)
+        
+        self.buffer = self.textview.get_buffer()
+        self.highlighter = MarkdownHighlighter(self.buffer)
+        
+        self.load_file()
+        
+        self.buffer.connect("changed", self.on_buffer_changed)
+        self.save_timeout_id = 0
+        
+        # Add keyboard shortcuts
+        key_ctrl = Gtk.EventControllerKey()
+        key_ctrl.connect("key-pressed", self.on_key_pressed)
+        self.textview.add_controller(key_ctrl)
+
+    def on_key_pressed(self, controller, keyval, keycode, state):
+        if state & Gdk.ModifierType.CONTROL_MASK:
+            if keyval == Gdk.KEY_b or keyval == Gdk.KEY_B:
+                self.wrap_text("**", "**", "bold")
+                return True
+            elif keyval == Gdk.KEY_i or keyval == Gdk.KEY_I:
+                self.wrap_text("*", "*", "italic")
+                return True
+            elif keyval == Gdk.KEY_u or keyval == Gdk.KEY_U:
+                self.wrap_text("<u>", "</u>", "underline")
+                return True
+        return False
+
+    def wrap_text(self, prefix, suffix, default_text):
+        bounds = self.buffer.get_selection_bounds()
+        if bounds:
+            start, end = bounds
+            text = self.buffer.get_text(start, end, False)
+            self.buffer.delete(start, end)
+            
+            # Start iter might be invalid after delete, get it again
+            start = self.buffer.get_iter_at_mark(self.buffer.get_insert())
+            self.buffer.insert(start, f"{prefix}{text}{suffix}")
+        else:
+            start = self.buffer.get_iter_at_mark(self.buffer.get_insert())
+            self.buffer.insert(start, f"{prefix}{default_text}{suffix}")
+            
+            # Select the default text
+            insert_iter = self.buffer.get_iter_at_mark(self.buffer.get_insert())
+            insert_iter.backward_chars(len(suffix) + len(default_text))
+            
+            bound_iter = insert_iter.copy()
+            bound_iter.forward_chars(len(default_text))
+            
+            self.buffer.select_range(insert_iter, bound_iter)
+
+    def load_file(self):
+        if self.file_path.exists():
+            content = self.file_path.read_text(encoding='utf-8')
+            self.buffer.set_text(content)
+            self.highlighter.highlight()
+
+    def on_buffer_changed(self, buffer):
+        if self.save_timeout_id:
+            GLib.source_remove(self.save_timeout_id)
+        self.save_timeout_id = GLib.timeout_add(1000, self.save_file)
+        
+        if self.on_title_changed:
+            self.on_title_changed(self)
+
+    def save_file(self):
+        self.save_timeout_id = 0
+        start, end = self.buffer.get_bounds()
+        text = self.buffer.get_text(start, end, True)
+        self.file_path.write_text(text, encoding='utf-8')
+        return False
+
+    def get_title(self):
+        start, end = self.buffer.get_bounds()
+        text = self.buffer.get_text(start, end, True)
+        first_line = text.split('\n')[0].strip() if text else ""
+        first_line = re.sub(r'^#+\s*', '', first_line)
+        return first_line if first_line else "New Note"
+
+class NotaWindow(Adw.ApplicationWindow):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.set_default_size(400, 400)
+        self.set_title("Nota")
+        
+        DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+        self.box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        self.set_content(self.box)
+
+        # Actions
+        new_note_action = Gio.SimpleAction.new("new-note", None)
+        new_note_action.connect("activate", self.on_new_note)
+        self.add_action(new_note_action)
+        
+        pref_action = Gio.SimpleAction.new("preferences", None)
+        pref_action.connect("activate", self.on_preferences)
+        self.add_action(pref_action)
+
+        # HeaderBar
+        self.header_bar = Adw.HeaderBar()
+        self.box.append(self.header_bar)
+        
+        # Title Button with Popover
+        self.title_button = Gtk.MenuButton()
+        self.title_button.set_always_show_arrow(True)
+        self.title_button.set_label("Nota")
+        self.title_button.add_css_class("flat")
+        self.header_bar.set_title_widget(self.title_button)
+
+        self.popover = Gtk.Popover()
+        self.title_button.set_popover(self.popover)
+        self.popover.connect("notify::visible", self.on_popover_visible)
+
+        popover_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        popover_box.set_margin_top(12)
+        popover_box.set_margin_bottom(12)
+        popover_box.set_margin_start(12)
+        popover_box.set_margin_end(12)
+        self.popover.set_child(popover_box)
+
+        self.search_entry = Gtk.SearchEntry()
+        self.search_entry.connect("search-changed", self.on_search_changed)
+        popover_box.append(self.search_entry)
+
+        scrolled = Gtk.ScrolledWindow()
+        scrolled.set_min_content_height(200)
+        scrolled.set_min_content_width(200)
+        scrolled.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        popover_box.append(scrolled)
+
+        self.note_listbox = Gtk.ListBox()
+        self.note_listbox.set_selection_mode(Gtk.SelectionMode.SINGLE)
+        self.note_listbox.add_css_class("boxed-list")
+        self.note_listbox.connect("row-activated", self.on_note_row_activated)
+        scrolled.set_child(self.note_listbox)
+
+        # New Note Button
+        new_btn = Gtk.Button(icon_name="list-add-symbolic")
+        new_btn.set_action_name("win.new-note")
+        self.header_bar.pack_start(new_btn)
+        
+        # Delete Note Button
+        del_btn = Gtk.Button(icon_name="user-trash-symbolic")
+        del_btn.connect("clicked", self.on_delete_note)
+        del_btn.add_css_class("destructive-action")
+        self.header_bar.pack_end(del_btn)
+        
+        # Hamburger menu
+        self.menu_button = Gtk.MenuButton()
+        self.menu_button.set_icon_name("open-menu-symbolic")
+        menu_model = Gio.Menu()
+        menu_model.append("Preferences", "win.preferences")
+        self.menu_button.set_menu_model(menu_model)
+        self.header_bar.pack_end(self.menu_button)
+
+        # Carousel
+        self.carousel = Adw.Carousel()
+        self.carousel.set_spacing(16)
+        self.carousel.set_interactive(True)
+        self.carousel.connect("page-changed", self.on_page_changed)
+        self.box.append(self.carousel)
+
+    def load_notes(self):
+        files = sorted(DATA_DIR.glob("*.md"), key=lambda f: os.path.getmtime(f) if f.exists() else 0, reverse=True)
+        # Load up to 10 most recently modified notes
+        recent_files = files[:10]
+        
+        if not recent_files:
+            self.add_note()
+        else:
+            # Reverse back to append in chronological order so newest is at the end
+            for f in reversed(recent_files):
+                self.add_note(f)
+        
+        if self.carousel.get_n_pages() > 0:
+            GLib.idle_add(self.update_title)
+
+    def add_note(self, file_path=None):
+        editor = NoteEditor(file_path=file_path, on_title_changed=self.on_editor_title_changed)
+        self.carousel.append(editor)
+        # Disable animation for instant snappy feeling
+        self.carousel.scroll_to(editor, False)
+        self.update_title()
+
+    def on_new_note(self, action=None, param=None):
+        self.add_note()
+
+    def on_delete_note(self, btn):
+        n_pages = self.carousel.get_n_pages()
+        if n_pages == 0:
+            return
+            
+        current_page_idx = int(round(self.carousel.get_position()))
+        editor = self.carousel.get_nth_page(current_page_idx)
+        
+        if editor.file_path.exists():
+            TRASH_DIR.mkdir(parents=True, exist_ok=True)
+            shutil.move(str(editor.file_path), str(TRASH_DIR / editor.file_path.name))
+            
+        self.carousel.remove(editor)
+        
+        if self.carousel.get_n_pages() == 0:
+            self.add_note()
+        else:
+            self.update_title()
+
+
+    def on_page_changed(self, carousel, index):
+        self.update_title()
+
+    def on_editor_title_changed(self, editor):
+        if self.carousel.get_n_pages() == 0:
+            return
+        current_page_idx = int(round(self.carousel.get_position()))
+        if current_page_idx < self.carousel.get_n_pages():
+            current_editor = self.carousel.get_nth_page(current_page_idx)
+            if editor == current_editor:
+                self.update_title()
+
+    def update_title(self):
+        n_pages = self.carousel.get_n_pages()
+        if n_pages == 0:
+            self.title_button.set_label("Nota")
+            return
+            
+        current_page_idx = int(round(self.carousel.get_position()))
+        if current_page_idx < n_pages:
+            editor = self.carousel.get_nth_page(current_page_idx)
+            self.title_button.set_label(editor.get_title())
+
+    def on_popover_visible(self, popover, param):
+        if popover.get_visible():
+            self.search_entry.set_text("")
+            self.populate_note_list()
+            self.search_entry.grab_focus()
+
+    def populate_note_list(self, search_text=""):
+        # Clear existing rows
+        while child := self.note_listbox.get_first_child():
+            self.note_listbox.remove(child)
+            
+        search_text = search_text.lower()
+        files = sorted(DATA_DIR.glob("*.md"), key=lambda f: os.path.getmtime(f) if f.exists() else 0, reverse=True)
+        
+        for f in files:
+            content = f.read_text(encoding='utf-8') if f.exists() else ""
+            first_line = content.split('\n')[0].strip() if content else ""
+            title = re.sub(r'^#+\s*', '', first_line) if first_line else "New Note"
+            
+            tags = set(re.findall(r'#(\w+)', content))
+            tag_str = " ".join([f"#{t}" for t in tags])
+            
+            if search_text:
+                searchable = (title + " " + tag_str).lower()
+                if search_text not in searchable:
+                    continue
+                    
+            row = Gtk.ListBoxRow()
+            vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+            vbox.set_margin_start(12)
+            vbox.set_margin_end(12)
+            vbox.set_margin_top(8)
+            vbox.set_margin_bottom(8)
+            
+            label = Gtk.Label(label=title, xalign=0)
+            vbox.append(label)
+            
+            if tag_str:
+                tag_label = Gtk.Label(label=tag_str, xalign=0)
+                tag_label.add_css_class("dim-label")
+                vbox.append(tag_label)
+                
+            row.set_child(vbox)
+            row.file_path = f
+            self.note_listbox.append(row)
+
+    def on_search_changed(self, entry):
+        self.populate_note_list(entry.get_text())
+
+    def on_note_row_activated(self, listbox, row):
+        file_path = getattr(row, 'file_path', None)
+        if file_path:
+            # Check if it's already in the carousel
+            found = False
+            for i in range(self.carousel.get_n_pages()):
+                editor = self.carousel.get_nth_page(i)
+                if editor.file_path == file_path:
+                    self.carousel.scroll_to(editor, True)
+                    found = True
+                    break
+            
+            if not found:
+                self.add_note(file_path)
+            self.update_title()
+        self.popover.popdown()
+
+    def on_preferences(self, action, param):
+        pref_window = Adw.PreferencesWindow(transient_for=self)
+        page = Adw.PreferencesPage()
+        group = Adw.PreferencesGroup(title="Storage")
+        
+        row = Adw.ActionRow(title="Notes Directory", subtitle=str(DATA_DIR))
+        
+        btn = Gtk.Button(label="Change...")
+        btn.set_valign(Gtk.Align.CENTER)
+        btn.connect("clicked", self.on_change_dir, row)
+        row.add_suffix(btn)
+        
+        group.add(row)
+        page.add(group)
+        pref_window.add(page)
+        pref_window.present()
+
+    def on_change_dir(self, btn, row):
+        dialog = Gtk.FileDialog()
+        dialog.set_title("Select Notes Directory")
+        dialog.select_folder(self, None, self.on_folder_selected, row)
+
+    def on_folder_selected(self, dialog, result, row):
+        global DATA_DIR, TRASH_DIR
+        try:
+            folder = dialog.select_folder_finish(result)
+            new_dir = Path(folder.get_path())
+            if new_dir != DATA_DIR:
+                config.data_dir = new_dir
+                DATA_DIR = new_dir
+                TRASH_DIR = DATA_DIR.parent / ".trash"
+                row.set_subtitle(str(DATA_DIR))
+                
+                DATA_DIR.mkdir(parents=True, exist_ok=True)
+                
+                # Clear carousel and reload
+                while self.carousel.get_n_pages() > 0:
+                    self.carousel.remove(self.carousel.get_nth_page(0))
+                self.load_notes()
+        except GLib.Error:
+            pass
+
+class NotaApp(Adw.Application):
+    def __init__(self):
+        super().__init__(application_id="com.example.Nota", flags=Gio.ApplicationFlags.HANDLES_OPEN)
+
+    def do_startup(self):
+        Adw.Application.do_startup(self)
+        self.set_accels_for_action("win.new-note", ["<Ctrl>n"])
+        self.set_accels_for_action("win.preferences", ["<Ctrl>comma"])
+
+    def do_activate(self):
+
+        win = self.props.active_window
+        if not win:
+            win = NotaWindow(application=self)
+            win.load_notes()
+        win.present()
+
+    def do_open(self, files, n_files, hint):
+        win = self.props.active_window
+        if not win:
+            win = NotaWindow(application=self)
+            win.load_notes()
+            
+        for file in files:
+            path = file.get_path()
+            if path and path.endswith('.md'):
+                # Check if it's already in the carousel
+                found = False
+                n_pages = win.carousel.get_n_pages()
+                for i in range(n_pages):
+                    editor = win.carousel.get_nth_page(i)
+                    if str(editor.file_path) == path:
+                        win.carousel.scroll_to(editor, True)
+                        found = True
+                        break
+                
+                # If not, add it
+                if not found:
+                    win.add_note(path)
+                    
+        win.present()
+
+if __name__ == "__main__":
+    app = NotaApp()
+    sys.exit(app.run(sys.argv))

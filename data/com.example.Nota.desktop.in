@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=Nota
+GenericName=Note Taker
+Comment=A minimalist note taking widget application
+Exec=@bindir@/nota %F
+Icon=com.example.Nota
+Terminal=false
+Type=Application
+Categories=Utility;TextEditor;
+StartupNotify=true
+MimeType=text/markdown;text/plain;

@@ -57,5 +57,4 @@ Once installed, you can launch Nota directly from your application launcher (app
 Nota strictly follows the GNOME HIG (Human Interface Guidelines). It leverages `Adw.Carousel` for its swipeable interface and uses an elegant `Gtk.TextView` wrapper to instantly parse and decorate Markdown text using `Gtk.TextTag`.
 
 ## License
-
-*(Add your license information here, e.g., MIT, GPLv3)*
+Still thinking about this

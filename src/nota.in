@@ -19,7 +19,13 @@ CONFIG_FILE = CONFIG_DIR / "config.json"
 
 class Config:
     def __init__(self):
-        self.data = {"data_dir": str(Path.home() / ".local" / "share" / "nota" / "notes")}
+        self.data = {
+            "data_dir": str(Path.home() / ".local" / "share" / "nota" / "notes"),
+            "window_width": 400,
+            "window_height": 400,
+            "is_maximized": False,
+            "font_name": ""
+        }
         self.load()
 
     def load(self):
@@ -44,6 +50,13 @@ class Config:
         self.data["data_dir"] = str(value)
         self.save()
 
+    def get(self, key):
+        return self.data.get(key)
+
+    def set(self, key, value):
+        self.data[key] = value
+        self.save()
+
 config = Config()
 DATA_DIR = config.data_dir
 TRASH_DIR = DATA_DIR.parent / ".trash"
@@ -54,8 +67,10 @@ class MarkdownHighlighter:
         self.buffer = buffer
         self.create_tags()
         self.buffer.connect("changed", self.on_changed)
+        self.buffer.connect("notify::cursor-position", self.on_cursor_moved)
         # Timeout ID for debouncing
         self.timeout_id = 0
+        self.last_cursor_line = -1
 
     def create_tags(self):
         # Headings
@@ -74,58 +89,87 @@ class MarkdownHighlighter:
         # Bullet points
         self.tag_bullet = self.buffer.create_tag("bullet", indent=-15, left_margin=30)
         self.tag_bullet_bold = self.buffer.create_tag("bullet_bold", weight=Pango.Weight.BOLD)
+        
+        # Invisible tag for WYSIWYG
+        self.tag_invisible = self.buffer.create_tag("invisible", invisible=True)
+
+    def on_cursor_moved(self, buffer, param):
+        cursor_iter = self.buffer.get_iter_at_mark(self.buffer.get_insert())
+        cursor_line = cursor_iter.get_line()
+        if cursor_line != self.last_cursor_line:
+            self.last_cursor_line = cursor_line
+            if self.timeout_id:
+                GLib.source_remove(self.timeout_id)
+            self.timeout_id = GLib.timeout_add(10, self.highlight)
 
     def on_changed(self, buffer):
         if self.timeout_id:
             GLib.source_remove(self.timeout_id)
-        self.timeout_id = GLib.timeout_add(300, self.highlight)
+        self.timeout_id = GLib.timeout_add(10, self.highlight)
 
     def highlight(self):
         self.timeout_id = 0
         start, end = self.buffer.get_bounds()
         text = self.buffer.get_text(start, end, True)
         
+        cursor_iter = self.buffer.get_iter_at_mark(self.buffer.get_insert())
+        cursor_line = cursor_iter.get_line()
+        
         # Remove all formatting tags first
         self.buffer.remove_all_tags(start, end)
         
+        def apply_invisible(m, group_idx=1):
+            start_offset = m.start(group_idx)
+            end_offset = m.end(group_idx)
+            start_iter = self.buffer.get_iter_at_offset(start_offset)
+            end_iter = self.buffer.get_iter_at_offset(end_offset)
+            
+            if start_iter.get_line() != cursor_line:
+                self.buffer.apply_tag(self.tag_invisible, start_iter, end_iter)
+        
         # Apply headings (e.g. # Heading)
-        for m in re.finditer(r'^(#{1,3})\s+(.*)$', text, re.MULTILINE):
+        for m in re.finditer(r'^(#{1,6})\s+(.*)$', text, re.MULTILINE):
             level = len(m.group(1))
             tag = self.tag_h1 if level == 1 else (self.tag_h2 if level == 2 else self.tag_h3)
             start_iter = self.buffer.get_iter_at_offset(m.start())
             end_iter = self.buffer.get_iter_at_offset(m.end())
             self.buffer.apply_tag(tag, start_iter, end_iter)
+            apply_invisible(m, 1) # Hide the '#'
             
         # Apply bullet points (- item or * item) and numbered lists (1. item)
         for m in re.finditer(r'^(\s*(?:[-*+]|\d+\.)\s+)(.*)$', text, re.MULTILINE):
             start_iter = self.buffer.get_iter_at_offset(m.start())
             end_iter = self.buffer.get_iter_at_offset(m.end())
             self.buffer.apply_tag(self.tag_bullet, start_iter, end_iter)
-            # Make the bullet character bold
             bullet_end_iter = self.buffer.get_iter_at_offset(m.start() + len(m.group(1)))
             self.buffer.apply_tag(self.tag_bullet_bold, start_iter, bullet_end_iter)
             
         # Apply bold (**text**)
-        for m in re.finditer(r'\*\*(.*?)\*\*', text):
+        for m in re.finditer(r'(\*\*)(.*?)(\*\*)', text):
             start_iter = self.buffer.get_iter_at_offset(m.start())
             end_iter = self.buffer.get_iter_at_offset(m.end())
             self.buffer.apply_tag(self.tag_bold, start_iter, end_iter)
+            apply_invisible(m, 1)
+            apply_invisible(m, 3)
             
         # Apply italic (*text*)
-        for m in re.finditer(r'\*(.*?)\*', text):
-            if m.group().startswith('**'): continue
+        for m in re.finditer(r'(?<!\*)(\*)([^\*]+)(\*)', text):
             start_iter = self.buffer.get_iter_at_offset(m.start())
             end_iter = self.buffer.get_iter_at_offset(m.end())
             self.buffer.apply_tag(self.tag_italic, start_iter, end_iter)
+            apply_invisible(m, 1)
+            apply_invisible(m, 3)
             
         # Apply underline (<u>text</u>)
-        for m in re.finditer(r'<u>(.*?)</u>', text):
+        for m in re.finditer(r'(<u>)(.*?)(</u>)', text):
             start_iter = self.buffer.get_iter_at_offset(m.start())
             end_iter = self.buffer.get_iter_at_offset(m.end())
             self.buffer.apply_tag(self.tag_underline, start_iter, end_iter)
+            apply_invisible(m, 1)
+            apply_invisible(m, 3)
 
         # Apply code (`text`)
-        for m in re.finditer(r'`(.*?)`', text):
+        for m in re.finditer(r'(`)(.*?)(`)', text):
             start_iter = self.buffer.get_iter_at_offset(m.start())
             end_iter = self.buffer.get_iter_at_offset(m.end())
             self.buffer.apply_tag(self.tag_code, start_iter, end_iter)
@@ -133,7 +177,7 @@ class MarkdownHighlighter:
         return False
 
 
-class NoteEditor(Gtk.ScrolledWindow):
+class NoteEditor(Gtk.Overlay):
     def __init__(self, file_path=None, on_title_changed=None):
         super().__init__()
         self.set_hexpand(True)
@@ -142,13 +186,25 @@ class NoteEditor(Gtk.ScrolledWindow):
         self.file_path = Path(file_path) if file_path else DATA_DIR / f"{uuid.uuid4().hex}.md"
         self.on_title_changed = on_title_changed
         
+        self.scrolled = Gtk.ScrolledWindow()
+        self.set_child(self.scrolled)
+        
         self.textview = Gtk.TextView()
         self.textview.set_wrap_mode(Gtk.WrapMode.WORD_CHAR)
         self.textview.set_left_margin(16)
         self.textview.set_right_margin(16)
         self.textview.set_top_margin(16)
         self.textview.set_bottom_margin(16)
-        self.set_child(self.textview)
+        self.scrolled.set_child(self.textview)
+        
+        # Word count label
+        self.word_count_label = Gtk.Label(label="0 words")
+        self.word_count_label.add_css_class("dim-label")
+        self.word_count_label.set_margin_end(16)
+        self.word_count_label.set_margin_bottom(16)
+        self.word_count_label.set_halign(Gtk.Align.END)
+        self.word_count_label.set_valign(Gtk.Align.END)
+        self.add_overlay(self.word_count_label)
         
         self.buffer = self.textview.get_buffer()
         self.highlighter = MarkdownHighlighter(self.buffer)
@@ -162,6 +218,24 @@ class NoteEditor(Gtk.ScrolledWindow):
         key_ctrl = Gtk.EventControllerKey()
         key_ctrl.connect("key-pressed", self.on_key_pressed)
         self.textview.add_controller(key_ctrl)
+        
+        self.update_word_count()
+
+    def update_word_count(self):
+        start, end = self.buffer.get_bounds()
+        text = self.buffer.get_text(start, end, False)
+        words = len(text.split())
+        chars = len(text)
+        self.word_count_label.set_label(f"{words} words  {chars} chars")
+
+    def on_buffer_changed(self, buffer):
+        self.update_word_count()
+        if self.save_timeout_id:
+            GLib.source_remove(self.save_timeout_id)
+        self.save_timeout_id = GLib.timeout_add(1000, self.save_file)
+        
+        if self.on_title_changed:
+            self.on_title_changed(self)
 
     def on_key_pressed(self, controller, keyval, keycode, state):
         if state & Gdk.ModifierType.CONTROL_MASK:
@@ -174,6 +248,46 @@ class NoteEditor(Gtk.ScrolledWindow):
             elif keyval == Gdk.KEY_u or keyval == Gdk.KEY_U:
                 self.wrap_text("<u>", "</u>", "underline")
                 return True
+                
+        if keyval == Gdk.KEY_Return or keyval == Gdk.KEY_KP_Enter:
+            return self.handle_return()
+            
+        return False
+
+    def handle_return(self):
+        insert_mark = self.buffer.get_insert()
+        cursor_iter = self.buffer.get_iter_at_mark(insert_mark)
+        
+        # Get current line text up to cursor
+        line_start = cursor_iter.copy()
+        line_start.set_line_offset(0)
+        line_text = self.buffer.get_text(line_start, cursor_iter, False)
+        
+        # Check if line is a numbered list
+        m = re.match(r'^(\s*)(\d+)\.\s+(.*)$', line_text)
+        if m:
+            indent, num, content = m.groups()
+            if not content.strip():
+                # Empty numbered list item -> remove formatting
+                self.buffer.delete(line_start, cursor_iter)
+                return False # Let default return happen
+            else:
+                next_num = int(num) + 1
+                self.buffer.insert(cursor_iter, f"\n{indent}{next_num}. ")
+                return True
+                
+        # Check if line is a bullet list
+        m = re.match(r'^(\s*)([-*+])\s+(.*)$', line_text)
+        if m:
+            indent, bullet, content = m.groups()
+            if not content.strip():
+                # Empty bullet list item
+                self.buffer.delete(line_start, cursor_iter)
+                return False
+            else:
+                self.buffer.insert(cursor_iter, f"\n{indent}{bullet} ")
+                return True
+                
         return False
 
     def wrap_text(self, prefix, suffix, default_text):
@@ -230,8 +344,25 @@ class NoteEditor(Gtk.ScrolledWindow):
 class NotaWindow(Adw.ApplicationWindow):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.set_default_size(400, 400)
+        
+        # Window State
+        width = config.get("window_width")
+        height = config.get("window_height")
+        self.set_default_size(width, height)
+        if config.get("is_maximized"):
+            self.maximize()
+            
         self.set_title("Nota")
+        self.connect("close-request", self.on_close_request)
+        
+        # Font styling
+        self.css_provider = Gtk.CssProvider()
+        Gtk.StyleContext.add_provider_for_display(
+            Gdk.Display.get_default(),
+            self.css_provider,
+            Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+        )
+        self.apply_font()
         
         DATA_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -257,6 +388,12 @@ class NotaWindow(Adw.ApplicationWindow):
         self.title_button.set_label("Nota")
         self.title_button.add_css_class("flat")
         self.header_bar.set_title_widget(self.title_button)
+        
+        # Pin (Always on top) button
+        self.pin_btn = Gtk.ToggleButton()
+        self.pin_btn.set_icon_name("view-pin-symbolic")
+        self.pin_btn.connect("toggled", self.on_pin_toggled)
+        self.header_bar.pack_start(self.pin_btn)
 
         self.popover = Gtk.Popover()
         self.title_button.set_popover(self.popover)
@@ -448,6 +585,27 @@ class NotaWindow(Adw.ApplicationWindow):
     def on_preferences(self, action, param):
         pref_window = Adw.PreferencesWindow(transient_for=self)
         page = Adw.PreferencesPage()
+        
+        # Appearance Group
+        font_group = Adw.PreferencesGroup(title="Appearance")
+        font_row = Adw.ActionRow(title="Editor Font")
+        
+        font_dialog = Gtk.FontDialog()
+        font_btn = Gtk.FontDialogButton()
+        font_btn.set_dialog(font_dialog)
+        font_btn.set_valign(Gtk.Align.CENTER)
+        
+        font_name = config.get("font_name")
+        if font_name:
+            font_desc = Pango.FontDescription.from_string(font_name)
+            font_btn.set_font_desc(font_desc)
+            
+        font_btn.connect("notify::font-desc", self.on_font_changed)
+        font_row.add_suffix(font_btn)
+        font_group.add(font_row)
+        page.add(font_group)
+
+        # Storage Group
         group = Adw.PreferencesGroup(title="Storage")
         
         row = Adw.ActionRow(title="Notes Directory", subtitle=str(DATA_DIR))
@@ -459,8 +617,16 @@ class NotaWindow(Adw.ApplicationWindow):
         
         group.add(row)
         page.add(group)
+        
         pref_window.add(page)
         pref_window.present()
+
+    def on_font_changed(self, font_btn, param):
+        desc = font_btn.get_font_desc()
+        if desc:
+            font_name = desc.to_string()
+            config.set("font_name", font_name)
+            self.apply_font()
 
     def on_change_dir(self, btn, row):
         dialog = Gtk.FileDialog()
@@ -486,6 +652,23 @@ class NotaWindow(Adw.ApplicationWindow):
                 self.load_notes()
         except GLib.Error:
             pass
+
+    def on_pin_toggled(self, btn):
+        self.set_keep_above(btn.get_active())
+
+    def on_close_request(self, window):
+        config.set("window_width", self.get_width())
+        config.set("window_height", self.get_height())
+        config.set("is_maximized", self.is_maximized())
+        return False
+
+    def apply_font(self):
+        font_name = config.get("font_name")
+        if font_name:
+            css = f"textview {{ font: {font_name}; }}"
+            self.css_provider.load_from_data(css.encode('utf-8'))
+        else:
+            self.css_provider.load_from_data(b"")
 
 class NotaApp(Adw.Application):
     def __init__(self):

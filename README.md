@@ -1,9 +1,9 @@
-# Nota
+# Whisp
 
 <img width="450" height="450" alt="image" src="https://github.com/user-attachments/assets/baed3f6d-71b5-4d69-9309-f8dd7e7b05da" />
 
 
-Nota is a minimalist, lightning-fast, and gesture-driven note-taking application built for the GNOME desktop environment. Designed to act as a seamless desktop scratchpad, it offers distraction-free Markdown editing while blending perfectly with modern GNOME aesthetics using GTK4 and Libadwaita.
+Whisp is a minimalist, lightning-fast, and gesture-driven note-taking application built for the GNOME desktop environment. Designed to act as a seamless desktop scratchpad, it offers distraction-free Markdown editing while blending perfectly with modern GNOME aesthetics using GTK4 and Libadwaita.
 
 
 ## Features
@@ -21,7 +21,7 @@ Nota is a minimalist, lightning-fast, and gesture-driven note-taking application
 
 ## Installation
 
-Nota uses the standard Meson build system, making it easy to compile and install on any Linux distribution.
+Whisp uses the standard Meson build system, making it easy to compile and install on any Linux distribution.
 
 ### Prerequisites
 

@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <component type="desktop-application">
-  <id>com.example.Nota</id>
-  <name>Nota</name>
+  <id>com.example.Whisp</id>
+  <name>Whisp</name>
   <summary>A minimalist note taking widget</summary>
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>GPL-3.0-or-later</project_license>
   <description>
-    <p>Nota is a beautifully simple, gesture-driven note-taking application designed for GNOME.</p>
+    <p>Whisp is a beautifully simple, gesture-driven note-taking application designed for GNOME.</p>
     <p>Features include:</p>
     <ul>
       <li>Live Markdown formatting (bold, italics, headers, code, lists)</li>
@@ -15,5 +15,5 @@
       <li>Instant saving and Native UI styling</li>
     </ul>
   </description>
-  <launchable type="desktop-id">com.example.Nota.desktop</launchable>
+  <launchable type="desktop-id">com.example.Whisp.desktop</launchable>
 </component>

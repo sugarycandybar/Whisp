@@ -24,7 +24,7 @@ class Config:
             "window_width": 400,
             "window_height": 400,
             "is_maximized": False,
-            "font_name": ""
+            "font_name": "Monospace 11"
         }
         self.load()
 
@@ -128,20 +128,19 @@ class MarkdownHighlighter:
                 self.buffer.apply_tag(self.tag_invisible, start_iter, end_iter)
         
         # Apply headings (e.g. # Heading)
-        for m in re.finditer(r'^(#{1,6})\s+(.*)$', text, re.MULTILINE):
-            level = len(m.group(1))
+        for m in re.finditer(r'^((#{1,6})\s+)(.*)$', text, re.MULTILINE):
+            level = len(m.group(2))
             tag = self.tag_h1 if level == 1 else (self.tag_h2 if level == 2 else self.tag_h3)
             start_iter = self.buffer.get_iter_at_offset(m.start())
             end_iter = self.buffer.get_iter_at_offset(m.end())
             self.buffer.apply_tag(tag, start_iter, end_iter)
-            apply_invisible(m, 1) # Hide the '#'
+            apply_invisible(m, 1) # Hide the '#' and trailing space
             
         # Apply bullet points (- item or * item) and numbered lists (1. item)
         for m in re.finditer(r'^(\s*(?:[-*+]|\d+\.)\s+)(.*)$', text, re.MULTILINE):
             start_iter = self.buffer.get_iter_at_offset(m.start())
-            end_iter = self.buffer.get_iter_at_offset(m.end())
-            self.buffer.apply_tag(self.tag_bullet, start_iter, end_iter)
             bullet_end_iter = self.buffer.get_iter_at_offset(m.start() + len(m.group(1)))
+            self.buffer.apply_tag(self.tag_bullet, start_iter, bullet_end_iter)
             self.buffer.apply_tag(self.tag_bullet_bold, start_iter, bullet_end_iter)
             
         # Apply bold (**text**)
@@ -187,6 +186,8 @@ class NoteEditor(Gtk.Overlay):
         self.on_title_changed = on_title_changed
         
         self.scrolled = Gtk.ScrolledWindow()
+        self.scrolled.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        self.scrolled.set_propagate_natural_width(False)
         self.set_child(self.scrolled)
         
         self.textview = Gtk.TextView()
@@ -250,8 +251,47 @@ class NoteEditor(Gtk.Overlay):
                 return True
                 
         if keyval == Gdk.KEY_Return or keyval == Gdk.KEY_KP_Enter:
-            return self.handle_return()
+            if not (state & Gdk.ModifierType.SHIFT_MASK):
+                return self.handle_return()
             
+        if keyval == Gdk.KEY_Tab or keyval == Gdk.KEY_KP_Tab:
+            if state & Gdk.ModifierType.SHIFT_MASK:
+                return self.handle_shift_tab()
+            else:
+                return self.handle_tab()
+            
+        return False
+
+    def handle_tab(self):
+        insert_mark = self.buffer.get_insert()
+        cursor_iter = self.buffer.get_iter_at_mark(insert_mark)
+        line_start = cursor_iter.copy()
+        line_start.set_line_offset(0)
+        self.buffer.insert(line_start, "    ")
+        return True
+
+    def handle_shift_tab(self):
+        insert_mark = self.buffer.get_insert()
+        cursor_iter = self.buffer.get_iter_at_mark(insert_mark)
+        line_start = cursor_iter.copy()
+        line_start.set_line_offset(0)
+        
+        check_iter = line_start.copy()
+        check_iter.forward_chars(4)
+        text = self.buffer.get_text(line_start, check_iter, False)
+        
+        spaces_to_remove = 0
+        for char in text:
+            if char == ' ':
+                spaces_to_remove += 1
+            else:
+                break
+                
+        if spaces_to_remove > 0:
+            del_iter = line_start.copy()
+            del_iter.forward_chars(spaces_to_remove)
+            self.buffer.delete(line_start, del_iter)
+            return True
         return False
 
     def handle_return(self):
@@ -352,7 +392,7 @@ class NotaWindow(Adw.ApplicationWindow):
         if config.get("is_maximized"):
             self.maximize()
             
-        self.set_title("Nota")
+        self.set_title("Whisp")
         self.connect("close-request", self.on_close_request)
         
         # Font styling
@@ -374,20 +414,18 @@ class NotaWindow(Adw.ApplicationWindow):
         new_note_action.connect("activate", self.on_new_note)
         self.add_action(new_note_action)
         
+        del_note_action = Gio.SimpleAction.new("delete-note", None)
+        del_note_action.connect("activate", self.on_delete_note)
+        self.add_action(del_note_action)
+        
         pref_action = Gio.SimpleAction.new("preferences", None)
         pref_action.connect("activate", self.on_preferences)
         self.add_action(pref_action)
 
         # HeaderBar
         self.header_bar = Adw.HeaderBar()
+        self.header_bar.add_css_class("flat")
         self.box.append(self.header_bar)
-        
-        # Title Button with Popover
-        self.title_button = Gtk.MenuButton()
-        self.title_button.set_always_show_arrow(True)
-        self.title_button.set_label("Nota")
-        self.title_button.add_css_class("flat")
-        self.header_bar.set_title_widget(self.title_button)
         
         # Pin (Always on top) button
         self.pin_btn = Gtk.ToggleButton()
@@ -395,8 +433,13 @@ class NotaWindow(Adw.ApplicationWindow):
         self.pin_btn.connect("toggled", self.on_pin_toggled)
         self.header_bar.pack_start(self.pin_btn)
 
+        # Search Toggle Button
+        self.search_btn = Gtk.MenuButton()
+        self.search_btn.set_icon_name("system-search-symbolic")
+        self.header_bar.pack_end(self.search_btn)
+
         self.popover = Gtk.Popover()
-        self.title_button.set_popover(self.popover)
+        self.search_btn.set_popover(self.popover)
         self.popover.connect("notify::visible", self.on_popover_visible)
 
         popover_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
@@ -429,7 +472,7 @@ class NotaWindow(Adw.ApplicationWindow):
         
         # Delete Note Button
         del_btn = Gtk.Button(icon_name="user-trash-symbolic")
-        del_btn.connect("clicked", self.on_delete_note)
+        del_btn.set_action_name("win.delete-note")
         del_btn.add_css_class("destructive-action")
         self.header_bar.pack_end(del_btn)
         
@@ -469,11 +512,12 @@ class NotaWindow(Adw.ApplicationWindow):
         # Disable animation for instant snappy feeling
         self.carousel.scroll_to(editor, False)
         self.update_title()
+        GLib.idle_add(lambda: [editor.textview.grab_focus(), False][-1])
 
     def on_new_note(self, action=None, param=None):
         self.add_note()
 
-    def on_delete_note(self, btn):
+    def on_delete_note(self, action=None, param=None):
         n_pages = self.carousel.get_n_pages()
         if n_pages == 0:
             return
@@ -506,15 +550,7 @@ class NotaWindow(Adw.ApplicationWindow):
                 self.update_title()
 
     def update_title(self):
-        n_pages = self.carousel.get_n_pages()
-        if n_pages == 0:
-            self.title_button.set_label("Nota")
-            return
-            
-        current_page_idx = int(round(self.carousel.get_position()))
-        if current_page_idx < n_pages:
-            editor = self.carousel.get_nth_page(current_page_idx)
-            self.title_button.set_label(editor.get_title())
+        pass
 
     def on_popover_visible(self, popover, param):
         if popover.get_visible():
@@ -665,7 +701,10 @@ class NotaWindow(Adw.ApplicationWindow):
     def apply_font(self):
         font_name = config.get("font_name")
         if font_name:
-            css = f"textview {{ font: {font_name}; }}"
+            font_desc = Pango.FontDescription.from_string(font_name)
+            family = font_desc.get_family()
+            size = font_desc.get_size() / Pango.SCALE
+            css = f"textview {{ font-family: '{family}'; font-size: {size}pt; }}"
             self.css_provider.load_from_data(css.encode('utf-8'))
         else:
             self.css_provider.load_from_data(b"")
@@ -677,10 +716,10 @@ class NotaApp(Adw.Application):
     def do_startup(self):
         Adw.Application.do_startup(self)
         self.set_accels_for_action("win.new-note", ["<Ctrl>n"])
+        self.set_accels_for_action("win.delete-note", ["<Ctrl>Delete"])
         self.set_accels_for_action("win.preferences", ["<Ctrl>comma"])
 
     def do_activate(self):
-
         win = self.props.active_window
         if not win:
             win = NotaWindow(application=self)

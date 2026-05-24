@@ -50,8 +50,8 @@ class Config:
         self.data["data_dir"] = str(value)
         self.save()
 
-    def get(self, key):
-        return self.data.get(key)
+    def get(self, key, default=None):
+        return self.data.get(key, default)
 
     def set(self, key, value):
         self.data[key] = value
@@ -82,8 +82,9 @@ class MarkdownHighlighter:
         self.tag_bold = self.buffer.create_tag("bold", weight=Pango.Weight.BOLD)
         self.tag_italic = self.buffer.create_tag("italic", style=Pango.Style.ITALIC)
         self.tag_underline = self.buffer.create_tag("underline", underline=Pango.Underline.SINGLE)
-        self.tag_strikethrough = self.buffer.create_tag("strikethrough", strikethrough=True)
-        self.tag_checkbox = self.buffer.create_tag("checkbox", family="monospace", weight=Pango.Weight.BOLD, foreground="#888888")
+        self.tag_checkbox_checked = self.buffer.create_tag("checkbox_checked", strikethrough=True, foreground="#aaaaaa")
+        self.tag_checkbox_icon = self.buffer.create_tag("checkbox_icon", weight=Pango.Weight.BOLD, foreground="#aaaaaa")
+        self.tag_list_keyword = self.buffer.create_tag("list_keyword", foreground="#b48ead", weight=Pango.Weight.BOLD, pixels_below_lines=32)
         
         # Monospace / Code
         self.tag_code = self.buffer.create_tag("code", family="monospace", background="#2a2a2a")
@@ -130,14 +131,26 @@ class MarkdownHighlighter:
             if not (check_m.start() <= cursor_offset <= check_m.end()):
                 self.buffer.apply_tag(self.tag_invisible, start_iter, end_iter)
         
-        # Apply headings (e.g. # Heading)
-        for m in re.finditer(r'^((#{1,6})\s+)(.*)$', text, re.MULTILINE):
-            level = len(m.group(2))
-            tag = self.tag_h1 if level == 1 else (self.tag_h2 if level == 2 else self.tag_h3)
-            start_iter = self.buffer.get_iter_at_offset(m.start())
-            end_iter = self.buffer.get_iter_at_offset(m.end())
-            self.buffer.apply_tag(tag, start_iter, end_iter)
-            apply_invisible(m, 1) # Hide the '#' and trailing space
+        # Check if it's a list note
+        start_doc = self.buffer.get_start_iter()
+        end_doc = start_doc.copy()
+        end_doc.forward_to_line_end()
+        first_line = self.buffer.get_text(start_doc, end_doc, False).strip().lower()
+        is_list_note = first_line in ["list", "# list", "## list", "### list"]
+        
+        if is_list_note:
+            self.buffer.apply_tag(self.tag_list_keyword, start_doc, end_doc)
+        else:
+            # Apply headings (e.g. # Heading)
+            for m in re.finditer(r'^(#{1,6}\s+)(.*)$', text, re.MULTILINE):
+                level = len(m.group(1).strip())
+                start_iter = self.buffer.get_iter_at_offset(m.start())
+                end_iter = self.buffer.get_iter_at_offset(m.end())
+                
+                tag = getattr(self, f"tag_h{level}", self.tag_h1)
+                self.buffer.apply_tag(tag, start_iter, end_iter)
+                
+                apply_invisible(m, 1, outer_match=m)
             
         # Apply bullet points (- item or * item) and numbered lists (1. item)
         for m in re.finditer(r'^(\s*(?:[-*+]|\d+\.)\s+)(.*)$', text, re.MULTILINE):
@@ -170,19 +183,16 @@ class MarkdownHighlighter:
             apply_invisible(m, 1, outer_match=m)
             apply_invisible(m, 3, outer_match=m)
             
-        # Apply strikethrough (~~text~~)
-        for m in re.finditer(r'(~~)(.*?)(~~)', text):
-            start_iter = self.buffer.get_iter_at_offset(m.start())
-            end_iter = self.buffer.get_iter_at_offset(m.end())
-            self.buffer.apply_tag(self.tag_strikethrough, start_iter, end_iter)
-            apply_invisible(m, 1, outer_match=m)
-            apply_invisible(m, 3, outer_match=m)
+        # Apply checkboxes (☐ or ☑)
+        for m in re.finditer(r'^(\s*)([☐☑])\s*(.*)$', text, re.MULTILINE):
+            box_start = self.buffer.get_iter_at_offset(m.start(2))
+            box_end = self.buffer.get_iter_at_offset(m.end(2))
+            line_end = self.buffer.get_iter_at_offset(m.end(3))
             
-        # Apply checkboxes (- [ ] or - [x])
-        for m in re.finditer(r'^(\s*)(-\s+\[[ xX]\]\s+)(.*)$', text, re.MULTILINE):
-            start_iter = self.buffer.get_iter_at_offset(m.start(2))
-            end_iter = self.buffer.get_iter_at_offset(m.end(2))
-            self.buffer.apply_tag(self.tag_checkbox, start_iter, end_iter)
+            self.buffer.apply_tag(self.tag_checkbox_icon, box_start, box_end)
+            
+            if m.group(2) == '☑':
+                self.buffer.apply_tag(self.tag_checkbox_checked, box_start, line_end)
 
         # Apply code (`text`)
         for m in re.finditer(r'(`)(.*?)(`)', text):
@@ -223,10 +233,16 @@ class NoteEditor(Gtk.Overlay):
         self.buffer.connect("changed", self.on_buffer_changed)
         self.save_timeout_id = 0
         
-        # Add keyboard shortcuts
-        key_ctrl = Gtk.EventControllerKey()
-        key_ctrl.connect("key-pressed", self.on_key_pressed)
-        self.textview.add_controller(key_ctrl)
+        # Add keyboard shortcuts (Capture phase for structural locks)
+        key_ctrl_capture = Gtk.EventControllerKey()
+        key_ctrl_capture.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
+        key_ctrl_capture.connect("key-pressed", self.on_key_pressed_capture)
+        self.textview.add_controller(key_ctrl_capture)
+        
+        # Add keyboard shortcuts (Bubble phase for normal shortcuts)
+        key_ctrl_bubble = Gtk.EventControllerKey()
+        key_ctrl_bubble.connect("key-pressed", self.on_key_pressed_bubble)
+        self.textview.add_controller(key_ctrl_bubble)
 
     def on_buffer_changed(self, buffer):
         if self.save_timeout_id:
@@ -236,25 +252,60 @@ class NoteEditor(Gtk.Overlay):
         if self.on_title_changed:
             self.on_title_changed(self)
 
-    def on_key_pressed(self, controller, keyval, keycode, state):
-        if state & Gdk.ModifierType.CONTROL_MASK:
-            if keyval == Gdk.KEY_BackSpace:
+    def on_key_pressed_capture(self, controller, keyval, keycode, state):
+        if keyval == Gdk.KEY_BackSpace and not (state & (Gdk.ModifierType.CONTROL_MASK | Gdk.ModifierType.SHIFT_MASK | Gdk.ModifierType.ALT_MASK)):
+            if not self.buffer.get_has_selection():
                 insert_mark = self.buffer.get_insert()
                 cursor_iter = self.buffer.get_iter_at_mark(insert_mark)
                 line_start = cursor_iter.copy()
                 line_start.set_line_offset(0)
+                line_end = cursor_iter.copy()
+                line_end.forward_to_line_end()
                 
-                # If cursor is at the start of the line, let default Ctrl+Backspace handle it
+                text_before = self.buffer.get_text(line_start, cursor_iter, False)
+                full_line = self.buffer.get_text(line_start, line_end, False)
+                
+                if self.is_list_note():
+                    if re.match(r'^\s*[☐☑]\s*$', text_before):
+                        if re.match(r'^\s*[☐☑]\s*$', full_line):
+                            self.buffer.delete(line_start, line_end)
+                            if line_start.backward_char() and line_start.get_char() == '\n':
+                                t = line_start.copy()
+                                t.forward_char()
+                                self.buffer.delete(line_start, t)
+                            return True
+                line_start.set_line_offset(0)
+                
                 if cursor_iter.equal(line_start):
                     return False
                     
-                # If there's only whitespace or bullet from line start to cursor, delete that
                 text_before = self.buffer.get_text(line_start, cursor_iter, False)
-                if re.match(r'^\s*([-*+]|\d+\.)?\s*$', text_before):
+                if re.match(r'^\s*([-*+]|\d+\.|[☐☑])?\s*$', text_before):
+                    if self.is_list_note() and ('☐' in text_before or '☑' in text_before):
+                        line_end = cursor_iter.copy()
+                        line_end.forward_to_line_end()
+                        full_line_text = self.buffer.get_text(line_start, line_end, False)
+                        
+                        if re.match(r'^\s*[☐☑]\s*$', full_line_text):
+                            if self.count_checkboxes() <= 1:
+                                return True
+                            self.buffer.delete(line_start, line_end)
+                            if line_start.backward_char() and line_start.get_char() == '\n':
+                                tmp = line_start.copy()
+                                tmp.forward_char()
+                                self.buffer.delete(line_start, tmp)
+                            return True
+                        else:
+                            return True
+                            
                     self.buffer.delete(line_start, cursor_iter)
                     return True
                 return False
                 
+        return False
+
+    def on_key_pressed_bubble(self, controller, keyval, keycode, state):
+        if state & Gdk.ModifierType.CONTROL_MASK:
             if state & Gdk.ModifierType.SHIFT_MASK:
                 if keyval == Gdk.KEY_c or keyval == Gdk.KEY_C:
                     self.buffer.insert_at_cursor("- [ ] ")
@@ -270,7 +321,7 @@ class NoteEditor(Gtk.Overlay):
                 self.wrap_text("<u>", "</u>", "underline")
                 return True
             elif keyval == Gdk.KEY_s or keyval == Gdk.KEY_S:
-                self.wrap_text("~~", "~~", "strikethrough")
+                self.toggle_checkbox()
                 return True
                 
         if keyval == Gdk.KEY_Return or keyval == Gdk.KEY_KP_Enter:
@@ -317,38 +368,136 @@ class NoteEditor(Gtk.Overlay):
             return True
         return False
 
+    def toggle_checkbox(self):
+        insert_mark = self.buffer.get_insert()
+        cursor_iter = self.buffer.get_iter_at_mark(insert_mark)
+        line_start = cursor_iter.copy()
+        line_start.set_line_offset(0)
+        line_end = cursor_iter.copy()
+        line_end.forward_to_line_end()
+        line_text = self.buffer.get_text(line_start, line_end, False)
+        
+        m_box = re.match(r'^(\s*)([☐☑])\s*', line_text)
+        if m_box:
+            # Toggle it
+            box_offset = len(m_box.group(1))
+            box_iter = line_start.copy()
+            box_iter.forward_chars(box_offset)
+            box_end = box_iter.copy()
+            box_end.forward_chars(1)
+            current_box = self.buffer.get_text(box_iter, box_end, False)
+            new_box = "☑" if current_box == "☐" else "☐"
+            self.buffer.delete(box_iter, box_end)
+            self.buffer.insert(box_iter, new_box)
+            return True
+            
+        # If it's a bullet, replace bullet with checkbox
+        m_bullet = re.match(r'^(\s*)([-*+])\s+', line_text)
+        if m_bullet:
+            b_offset = len(m_bullet.group(1))
+            b_iter = line_start.copy()
+            b_iter.forward_chars(b_offset)
+            b_end = b_iter.copy()
+            b_end.forward_chars(len(m_bullet.group(2)))
+            self.buffer.delete(b_iter, b_end)
+            self.buffer.insert(b_iter, "☐")
+            return True
+            
+        # Otherwise, prepend checkbox after indent
+        m_indent = re.match(r'^(\s*)', line_text)
+        indent_len = len(m_indent.group(1)) if m_indent else 0
+        ins_iter = line_start.copy()
+        ins_iter.forward_chars(indent_len)
+        self.buffer.insert(ins_iter, "☐ ")
+        return True
+
+    def count_checkboxes(self):
+        start, end = self.buffer.get_bounds()
+        text = self.buffer.get_text(start, end, False)
+        return len(re.findall(r'^(\s*)[☐☑]', text, re.MULTILINE))
+
+    def is_empty(self):
+        start, end = self.buffer.get_bounds()
+        text = self.buffer.get_text(start, end, False).strip()
+        return len(text) == 0 or text.lower() == "list"
+
     def handle_return(self):
         insert_mark = self.buffer.get_insert()
         cursor_iter = self.buffer.get_iter_at_mark(insert_mark)
         
-        # Get current line text up to cursor
         line_start = cursor_iter.copy()
         line_start.set_line_offset(0)
         line_text = self.buffer.get_text(line_start, cursor_iter, False)
         
-        # Check if line is a numbered list
-        m = re.match(r'^(\s*)(\d+)\.\s+(.*)$', line_text)
-        if m:
-            indent, num, content = m.groups()
-            if not content.strip():
-                # Empty numbered list item -> remove formatting
-                self.buffer.delete(line_start, cursor_iter)
-                return False # Let default return happen
-            else:
-                next_num = int(num) + 1
-                self.buffer.insert(cursor_iter, f"\n{indent}{next_num}. ")
+        # Check if list note
+        start_iter = self.buffer.get_start_iter()
+        end_iter = start_iter.copy()
+        end_iter.forward_to_line_end()
+        first_line = self.buffer.get_text(start_iter, end_iter, False).strip().lower()
+        is_list = (first_line in ["list", "# list", "## list", "### list"])
+
+        if is_list:
+            # Empty checkbox
+            m_empty = re.match(r'^(\s*)[☐☑]\s*$', line_text)
+            if m_empty:
+                if self.count_checkboxes() <= 1:
+                    return True # Prevent deletion
+                
+                # Delete the entire line
+                line_end = cursor_iter.copy()
+                line_end.forward_to_line_end()
+                self.buffer.delete(line_start, line_end)
+                
+                # Delete the preceding newline so we don't leave an empty line
+                if line_start.backward_char() and line_start.get_char() == '\n':
+                    tmp = line_start.copy()
+                    tmp.forward_char()
+                    self.buffer.delete(line_start, tmp)
+                    
                 return True
                 
-        # Check if line is a bullet list
-        m = re.match(r'^(\s*)([-*+])\s+(.*)$', line_text)
-        if m:
-            indent, bullet, content = m.groups()
+            m_indent = re.match(r'^(\s*)', line_text)
+            indent = m_indent.group(1) if m_indent else ""
+            self.buffer.insert_at_cursor(f"\n{indent}☐ ")
+            return True
+
+        # Check if current line is an empty checkbox
+        m_empty = re.match(r'^(\s*)[☐☑]\s*$', line_text)
+        if m_empty:
+            self.buffer.delete(line_start, cursor_iter)
+            self.buffer.insert_at_cursor("\n")
+            return True
+            
+        # Check if current line is a checkbox
+        m_box = re.match(r'^(\s*)([☐☑])\s+(.*)$', line_text)
+        if m_box:
+            indent, box, content = m_box.groups()
+            self.buffer.insert_at_cursor(f"\n{indent}☐ ")
+            return True
+        
+        # Match unordered lists (- or *)
+        m_ul = re.match(r'^(\s*)([-*+])\s+(.*)$', line_text)
+        if m_ul:
+            indent, bullet, content = m_ul.groups()
             if not content.strip():
-                # Empty bullet list item
                 self.buffer.delete(line_start, cursor_iter)
-                return False
+                self.buffer.insert_at_cursor("\n")
+                return True
             else:
-                self.buffer.insert(cursor_iter, f"\n{indent}{bullet} ")
+                self.buffer.insert_at_cursor(f"\n{indent}{bullet} ")
+                return True
+                
+        # Match ordered lists (1., 2., etc)
+        m_ol = re.match(r'^(\s*)(\d+)\.\s+(.*)$', line_text)
+        if m_ol:
+            indent, num, content = m_ol.groups()
+            if not content.strip():
+                self.buffer.delete(line_start, cursor_iter)
+                self.buffer.insert_at_cursor("\n")
+                return True
+            else:
+                next_num = int(num) + 1
+                self.buffer.insert_at_cursor(f"\n{indent}{next_num}. ")
                 return True
                 
         return False
@@ -411,7 +560,10 @@ class WhispWindow(Adw.ApplicationWindow):
         # Window State
         width = config.get("window_width")
         height = config.get("window_height")
-        self.set_default_size(width, height)
+        if width is None or height is None:
+            width = 450
+            height = 700
+        self.set_default_size(int(width), int(height))
         if config.get("is_maximized"):
             self.maximize()
             
@@ -520,25 +672,61 @@ class WhispWindow(Adw.ApplicationWindow):
         recent_files = files[:10]
         
         if not recent_files:
-            self.add_note()
+            self.add_note(grab_focus=False)
         else:
             # Reverse back to append in chronological order so newest is at the end
             for f in reversed(recent_files):
-                self.add_note(f)
+                self.add_note(f, grab_focus=False)
         
-        if self.carousel.get_n_pages() > 0:
-            GLib.idle_add(self.update_title)
+        self.ensure_empty_note_at_end()
+        
+        n_pages = self.carousel.get_n_pages()
+        if n_pages > 0:
+            target_idx = n_pages - 2 if n_pages > 1 else 0
+            
+            last_active = config.get("last_active_note")
+            if last_active:
+                for i in range(n_pages):
+                    if str(self.carousel.get_nth_page(i).file_path) == last_active:
+                        target_idx = i
+                        break
+                        
+            target_editor = self.carousel.get_nth_page(target_idx)
+            self.carousel.scroll_to(target_editor, False)
+            
+            def grab_focus():
+                target_editor.textview.grab_focus()
+                buffer = target_editor.buffer
+                buffer.place_cursor(buffer.get_end_iter())
+                self.update_title()
+                return False
+            
+            GLib.idle_add(grab_focus)
 
-    def add_note(self, file_path=None):
+    def add_note(self, file_path=None, grab_focus=True):
         editor = NoteEditor(file_path=file_path, on_title_changed=self.on_editor_title_changed)
         self.carousel.append(editor)
         # Disable animation for instant snappy feeling
-        self.carousel.scroll_to(editor, False)
-        self.update_title()
-        GLib.idle_add(lambda: [editor.textview.grab_focus(), False][-1])
+        if grab_focus:
+            self.carousel.scroll_to(editor, False)
+            GLib.idle_add(lambda: [editor.textview.grab_focus(), False][-1])
+            self.update_title()
+        self.update_line_spacing()
+
+    def ensure_empty_note_at_end(self):
+        n_pages = self.carousel.get_n_pages()
+        if n_pages == 0:
+            self.add_note(grab_focus=False)
+            return
+            
+        last_editor = self.carousel.get_nth_page(n_pages - 1)
+        if not last_editor.is_empty():
+            self.add_note(grab_focus=False)
 
     def on_new_note(self, action=None, param=None):
-        self.add_note()
+        n_pages = self.carousel.get_n_pages()
+        if n_pages > 0:
+            self.carousel.scroll_to(self.carousel.get_nth_page(n_pages - 1), True)
 
     def on_delete_note(self, action=None, param=None):
         n_pages = self.carousel.get_n_pages()
@@ -562,8 +750,12 @@ class WhispWindow(Adw.ApplicationWindow):
 
     def on_page_changed(self, carousel, index):
         self.update_title()
+        editor = carousel.get_nth_page(int(round(index)))
+        if editor:
+            GLib.idle_add(lambda: [editor.textview.grab_focus(), False][-1])
 
     def on_editor_title_changed(self, editor):
+        self.ensure_empty_note_at_end()
         if self.carousel.get_n_pages() == 0:
             return
         current_page_idx = int(round(self.carousel.get_position()))
@@ -662,6 +854,23 @@ class WhispWindow(Adw.ApplicationWindow):
         font_btn.connect("notify::font-desc", self.on_font_changed)
         font_row.add_suffix(font_btn)
         font_group.add(font_row)
+        # Line Spacing
+        spacing_row = Adw.ActionRow(title="Line Spacing")
+        spacing_model = Gtk.StringList.new(["1.0", "1.2", "1.5", "2.0"])
+        spacing_dropdown = Gtk.DropDown(model=spacing_model)
+        spacing_dropdown.set_valign(Gtk.Align.CENTER)
+        
+        current_spacing = config.get("line_spacing", "1.2")
+        try:
+            idx = ["1.0", "1.2", "1.5", "2.0"].index(current_spacing)
+            spacing_dropdown.set_selected(idx)
+        except ValueError:
+            pass
+            
+        spacing_dropdown.connect("notify::selected-item", self.on_spacing_changed)
+        spacing_row.add_suffix(spacing_dropdown)
+        font_group.add(spacing_row)
+        
         page.add(font_group)
 
         # Storage Group
@@ -686,6 +895,35 @@ class WhispWindow(Adw.ApplicationWindow):
             font_name = desc.to_string()
             config.set("font_name", font_name)
             self.apply_font()
+
+    def on_spacing_changed(self, dropdown, param):
+        selected = dropdown.get_selected_item()
+        if selected:
+            spacing = selected.get_string()
+            config.set("line_spacing", spacing)
+            self.update_line_spacing()
+
+    def update_line_spacing(self):
+        spacing_str = config.get("line_spacing", "1.2")
+        try:
+            spacing_val = float(spacing_str)
+        except ValueError:
+            spacing_val = 1.2
+            
+        # Convert multiplier to rough pixels (assuming ~16px font size)
+        # Normal (1.0) = 0px
+        # Relaxed (1.2) = 3px above/below
+        # Loose (1.5) = 8px above/below
+        # Very Loose (2.0) = 16px above/below
+        extra_pixels = int((spacing_val - 1.0) * 16)
+        above_below = max(0, extra_pixels // 2)
+        inside_wrap = max(0, extra_pixels)
+        
+        for i in range(self.carousel.get_n_pages()):
+            editor = self.carousel.get_nth_page(i)
+            editor.textview.set_pixels_above_lines(above_below)
+            editor.textview.set_pixels_below_lines(above_below)
+            editor.textview.set_pixels_inside_wrap(inside_wrap)
 
     def on_change_dir(self, btn, row):
         dialog = Gtk.FileDialog()
@@ -719,6 +957,12 @@ class WhispWindow(Adw.ApplicationWindow):
         config.set("window_width", self.get_width())
         config.set("window_height", self.get_height())
         config.set("is_maximized", self.is_maximized())
+        
+        current_page_idx = int(round(self.carousel.get_position()))
+        if current_page_idx < self.carousel.get_n_pages():
+            editor = self.carousel.get_nth_page(current_page_idx)
+            config.set("last_active_note", str(editor.file_path))
+            
         return False
 
     def apply_font(self):
@@ -728,7 +972,10 @@ class WhispWindow(Adw.ApplicationWindow):
             family = font_desc.get_family()
             size = font_desc.get_size() / Pango.SCALE
             css = f"textview {{ font-family: '{family}'; font-size: {size}pt; }}"
-            self.css_provider.load_from_data(css.encode('utf-8'))
+            try:
+                self.css_provider.load_from_data(css.encode('utf-8'))
+            except GLib.Error:
+                pass
         else:
             self.css_provider.load_from_data(b"")
 

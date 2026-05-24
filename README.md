@@ -1,6 +1,6 @@
 # Whisp
 
-<img width="450" height="450" alt="image" src="https://github.com/user-attachments/assets/baed3f6d-71b5-4d69-9309-f8dd7e7b05da" />
+<img width="634" height="598" alt="image" src="https://github.com/user-attachments/assets/a034925d-7375-44b6-b886-b3ab4a884cc9" />
 
 
 Whisp is a minimalist, lightning-fast, and gesture-driven note-taking application built for the GNOME desktop environment. Designed to act as a seamless desktop scratchpad, it offers distraction-free Markdown editing while blending perfectly with modern GNOME aesthetics using GTK4 and Libadwaita.
@@ -37,7 +37,7 @@ Ensure you have the following dependencies installed:
 1. Clone the repository and navigate into the project directory:
    ```bash
    git clone <your-repo-url>
-   cd Nota
+   cd Whisp
    ```
 
 2. Setup the build directory:

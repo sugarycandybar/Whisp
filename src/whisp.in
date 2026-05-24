@@ -14,13 +14,13 @@ gi.require_version('Adw', '1')
 from gi.repository import Gtk, Adw, GLib, Pango, Gio, Gdk
 
 # Data directory configuration
-CONFIG_DIR = Path.home() / ".config" / "nota"
+CONFIG_DIR = Path.home() / ".config" / "whisp"
 CONFIG_FILE = CONFIG_DIR / "config.json"
 
 class Config:
     def __init__(self):
         self.data = {
-            "data_dir": str(Path.home() / ".local" / "share" / "nota" / "notes"),
+            "data_dir": str(Path.home() / ".local" / "share" / "whisp" / "notes"),
             "window_width": 400,
             "window_height": 400,
             "is_maximized": False,
@@ -82,6 +82,8 @@ class MarkdownHighlighter:
         self.tag_bold = self.buffer.create_tag("bold", weight=Pango.Weight.BOLD)
         self.tag_italic = self.buffer.create_tag("italic", style=Pango.Style.ITALIC)
         self.tag_underline = self.buffer.create_tag("underline", underline=Pango.Underline.SINGLE)
+        self.tag_strikethrough = self.buffer.create_tag("strikethrough", strikethrough=True)
+        self.tag_checkbox = self.buffer.create_tag("checkbox", family="monospace", weight=Pango.Weight.BOLD, foreground="#888888")
         
         # Monospace / Code
         self.tag_code = self.buffer.create_tag("code", family="monospace", background="#2a2a2a")
@@ -113,18 +115,19 @@ class MarkdownHighlighter:
         text = self.buffer.get_text(start, end, True)
         
         cursor_iter = self.buffer.get_iter_at_mark(self.buffer.get_insert())
-        cursor_line = cursor_iter.get_line()
+        cursor_offset = cursor_iter.get_offset()
         
         # Remove all formatting tags first
         self.buffer.remove_all_tags(start, end)
         
-        def apply_invisible(m, group_idx=1):
+        def apply_invisible(m, group_idx=1, outer_match=None):
+            check_m = outer_match if outer_match else m
             start_offset = m.start(group_idx)
             end_offset = m.end(group_idx)
             start_iter = self.buffer.get_iter_at_offset(start_offset)
             end_iter = self.buffer.get_iter_at_offset(end_offset)
             
-            if start_iter.get_line() != cursor_line:
+            if not (check_m.start() <= cursor_offset <= check_m.end()):
                 self.buffer.apply_tag(self.tag_invisible, start_iter, end_iter)
         
         # Apply headings (e.g. # Heading)
@@ -164,8 +167,22 @@ class MarkdownHighlighter:
             start_iter = self.buffer.get_iter_at_offset(m.start())
             end_iter = self.buffer.get_iter_at_offset(m.end())
             self.buffer.apply_tag(self.tag_underline, start_iter, end_iter)
-            apply_invisible(m, 1)
-            apply_invisible(m, 3)
+            apply_invisible(m, 1, outer_match=m)
+            apply_invisible(m, 3, outer_match=m)
+            
+        # Apply strikethrough (~~text~~)
+        for m in re.finditer(r'(~~)(.*?)(~~)', text):
+            start_iter = self.buffer.get_iter_at_offset(m.start())
+            end_iter = self.buffer.get_iter_at_offset(m.end())
+            self.buffer.apply_tag(self.tag_strikethrough, start_iter, end_iter)
+            apply_invisible(m, 1, outer_match=m)
+            apply_invisible(m, 3, outer_match=m)
+            
+        # Apply checkboxes (- [ ] or - [x])
+        for m in re.finditer(r'^(\s*)(-\s+\[[ xX]\]\s+)(.*)$', text, re.MULTILINE):
+            start_iter = self.buffer.get_iter_at_offset(m.start(2))
+            end_iter = self.buffer.get_iter_at_offset(m.end(2))
+            self.buffer.apply_tag(self.tag_checkbox, start_iter, end_iter)
 
         # Apply code (`text`)
         for m in re.finditer(r'(`)(.*?)(`)', text):
@@ -198,15 +215,6 @@ class NoteEditor(Gtk.Overlay):
         self.textview.set_bottom_margin(16)
         self.scrolled.set_child(self.textview)
         
-        # Word count label
-        self.word_count_label = Gtk.Label(label="0 words")
-        self.word_count_label.add_css_class("dim-label")
-        self.word_count_label.set_margin_end(16)
-        self.word_count_label.set_margin_bottom(16)
-        self.word_count_label.set_halign(Gtk.Align.END)
-        self.word_count_label.set_valign(Gtk.Align.END)
-        self.add_overlay(self.word_count_label)
-        
         self.buffer = self.textview.get_buffer()
         self.highlighter = MarkdownHighlighter(self.buffer)
         
@@ -219,18 +227,8 @@ class NoteEditor(Gtk.Overlay):
         key_ctrl = Gtk.EventControllerKey()
         key_ctrl.connect("key-pressed", self.on_key_pressed)
         self.textview.add_controller(key_ctrl)
-        
-        self.update_word_count()
-
-    def update_word_count(self):
-        start, end = self.buffer.get_bounds()
-        text = self.buffer.get_text(start, end, False)
-        words = len(text.split())
-        chars = len(text)
-        self.word_count_label.set_label(f"{words} words  {chars} chars")
 
     def on_buffer_changed(self, buffer):
-        self.update_word_count()
         if self.save_timeout_id:
             GLib.source_remove(self.save_timeout_id)
         self.save_timeout_id = GLib.timeout_add(1000, self.save_file)
@@ -240,6 +238,28 @@ class NoteEditor(Gtk.Overlay):
 
     def on_key_pressed(self, controller, keyval, keycode, state):
         if state & Gdk.ModifierType.CONTROL_MASK:
+            if keyval == Gdk.KEY_BackSpace:
+                insert_mark = self.buffer.get_insert()
+                cursor_iter = self.buffer.get_iter_at_mark(insert_mark)
+                line_start = cursor_iter.copy()
+                line_start.set_line_offset(0)
+                
+                # If cursor is at the start of the line, let default Ctrl+Backspace handle it
+                if cursor_iter.equal(line_start):
+                    return False
+                    
+                # If there's only whitespace or bullet from line start to cursor, delete that
+                text_before = self.buffer.get_text(line_start, cursor_iter, False)
+                if re.match(r'^\s*([-*+]|\d+\.)?\s*$', text_before):
+                    self.buffer.delete(line_start, cursor_iter)
+                    return True
+                return False
+                
+            if state & Gdk.ModifierType.SHIFT_MASK:
+                if keyval == Gdk.KEY_c or keyval == Gdk.KEY_C:
+                    self.buffer.insert_at_cursor("- [ ] ")
+                    return True
+                    
             if keyval == Gdk.KEY_b or keyval == Gdk.KEY_B:
                 self.wrap_text("**", "**", "bold")
                 return True
@@ -248,6 +268,9 @@ class NoteEditor(Gtk.Overlay):
                 return True
             elif keyval == Gdk.KEY_u or keyval == Gdk.KEY_U:
                 self.wrap_text("<u>", "</u>", "underline")
+                return True
+            elif keyval == Gdk.KEY_s or keyval == Gdk.KEY_S:
+                self.wrap_text("~~", "~~", "strikethrough")
                 return True
                 
         if keyval == Gdk.KEY_Return or keyval == Gdk.KEY_KP_Enter:
@@ -381,7 +404,7 @@ class NoteEditor(Gtk.Overlay):
         first_line = re.sub(r'^#+\s*', '', first_line)
         return first_line if first_line else "New Note"
 
-class NotaWindow(Adw.ApplicationWindow):
+class WhispWindow(Adw.ApplicationWindow):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         
@@ -709,27 +732,27 @@ class NotaWindow(Adw.ApplicationWindow):
         else:
             self.css_provider.load_from_data(b"")
 
-class NotaApp(Adw.Application):
+class WhispApp(Adw.Application):
     def __init__(self):
-        super().__init__(application_id="com.example.Nota", flags=Gio.ApplicationFlags.HANDLES_OPEN)
+        super().__init__(application_id="com.example.Whisp", flags=Gio.ApplicationFlags.HANDLES_OPEN)
 
     def do_startup(self):
         Adw.Application.do_startup(self)
         self.set_accels_for_action("win.new-note", ["<Ctrl>n"])
-        self.set_accels_for_action("win.delete-note", ["<Ctrl>Delete"])
+        self.set_accels_for_action("win.delete-note", ["<Ctrl>d", "<Ctrl>Delete"])
         self.set_accels_for_action("win.preferences", ["<Ctrl>comma"])
 
     def do_activate(self):
         win = self.props.active_window
         if not win:
-            win = NotaWindow(application=self)
+            win = WhispWindow(application=self)
             win.load_notes()
         win.present()
 
     def do_open(self, files, n_files, hint):
         win = self.props.active_window
         if not win:
-            win = NotaWindow(application=self)
+            win = WhispWindow(application=self)
             win.load_notes()
             
         for file in files:
@@ -752,5 +775,5 @@ class NotaApp(Adw.Application):
         win.present()
 
 if __name__ == "__main__":
-    app = NotaApp()
+    app = WhispApp()
     sys.exit(app.run(sys.argv))

@@ -417,8 +417,8 @@ class NoteEditor(Gtk.Overlay):
             if not (state & Gdk.ModifierType.SHIFT_MASK):
                 return self.handle_return()
             
-        if keyval == Gdk.KEY_Tab or keyval == Gdk.KEY_KP_Tab:
-            if state & Gdk.ModifierType.SHIFT_MASK:
+        if keyval in (Gdk.KEY_Tab, Gdk.KEY_KP_Tab, Gdk.KEY_ISO_Left_Tab):
+            if (state & Gdk.ModifierType.SHIFT_MASK) or keyval == Gdk.KEY_ISO_Left_Tab or (state & Gdk.ModifierType.CONTROL_MASK):
                 return self.handle_shift_tab()
             else:
                 return self.handle_tab()

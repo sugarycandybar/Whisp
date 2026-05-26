@@ -78,6 +78,10 @@ class MarkdownHighlighter:
         self.tag_h2 = self.buffer.create_tag("h2", weight=Pango.Weight.BOLD, scale=1.5)
         self.tag_h3 = self.buffer.create_tag("h3", weight=Pango.Weight.BOLD, scale=1.25)
         
+        # Plain text headings (Orange color, bold, hashes grey)
+        self.tag_heading_plain = self.buffer.create_tag("heading_plain", foreground="#d08770", weight=Pango.Weight.BOLD)
+        self.tag_hash_plain = self.buffer.create_tag("hash_plain", foreground="#4c566a", weight=Pango.Weight.BOLD)
+        
         # Bold and Italic
         self.tag_bold = self.buffer.create_tag("bold", weight=Pango.Weight.BOLD)
         self.tag_italic = self.buffer.create_tag("italic", style=Pango.Style.ITALIC)
@@ -131,6 +135,8 @@ class MarkdownHighlighter:
             if not (check_m.start() <= cursor_offset <= check_m.end()):
                 self.buffer.apply_tag(self.tag_invisible, start_iter, end_iter)
         
+        wysiwyg = config.get("wysiwyg_mode", False)
+        
         # Check if it's a list note
         start_doc = self.buffer.get_start_iter()
         end_doc = start_doc.copy()
@@ -145,18 +151,23 @@ class MarkdownHighlighter:
             for m in re.finditer(r'^(#{1,6}\s+)(.*)$', text, re.MULTILINE):
                 level = len(m.group(1).strip())
                 start_iter = self.buffer.get_iter_at_offset(m.start())
+                hash_end = self.buffer.get_iter_at_offset(m.end(1))
                 end_iter = self.buffer.get_iter_at_offset(m.end())
                 
-                tag = getattr(self, f"tag_h{level}", self.tag_h1)
-                self.buffer.apply_tag(tag, start_iter, end_iter)
-                
-                apply_invisible(m, 1, outer_match=m)
+                if wysiwyg:
+                    tag = getattr(self, f"tag_h{level}", self.tag_h1)
+                    self.buffer.apply_tag(tag, start_iter, end_iter)
+                    apply_invisible(m, 1, outer_match=m)
+                else:
+                    self.buffer.apply_tag(self.tag_hash_plain, start_iter, hash_end)
+                    self.buffer.apply_tag(self.tag_heading_plain, hash_end, end_iter)
             
         # Apply bullet points (- item or * item) and numbered lists (1. item)
         for m in re.finditer(r'^(\s*(?:[-*+]|\d+\.)\s+)(.*)$', text, re.MULTILINE):
             start_iter = self.buffer.get_iter_at_offset(m.start())
             bullet_end_iter = self.buffer.get_iter_at_offset(m.start() + len(m.group(1)))
-            self.buffer.apply_tag(self.tag_bullet, start_iter, bullet_end_iter)
+            if wysiwyg:
+                self.buffer.apply_tag(self.tag_bullet, start_iter, bullet_end_iter)
             self.buffer.apply_tag(self.tag_bullet_bold, start_iter, bullet_end_iter)
             
         # Apply bold (**text**)
@@ -164,24 +175,27 @@ class MarkdownHighlighter:
             start_iter = self.buffer.get_iter_at_offset(m.start())
             end_iter = self.buffer.get_iter_at_offset(m.end())
             self.buffer.apply_tag(self.tag_bold, start_iter, end_iter)
-            apply_invisible(m, 1)
-            apply_invisible(m, 3)
+            if wysiwyg:
+                apply_invisible(m, 1)
+                apply_invisible(m, 3)
             
         # Apply italic (*text*)
         for m in re.finditer(r'(?<!\*)(\*)([^\*]+)(\*)', text):
             start_iter = self.buffer.get_iter_at_offset(m.start())
             end_iter = self.buffer.get_iter_at_offset(m.end())
             self.buffer.apply_tag(self.tag_italic, start_iter, end_iter)
-            apply_invisible(m, 1)
-            apply_invisible(m, 3)
+            if wysiwyg:
+                apply_invisible(m, 1)
+                apply_invisible(m, 3)
             
         # Apply underline (<u>text</u>)
         for m in re.finditer(r'(<u>)(.*?)(</u>)', text):
             start_iter = self.buffer.get_iter_at_offset(m.start())
             end_iter = self.buffer.get_iter_at_offset(m.end())
             self.buffer.apply_tag(self.tag_underline, start_iter, end_iter)
-            apply_invisible(m, 1, outer_match=m)
-            apply_invisible(m, 3, outer_match=m)
+            if wysiwyg:
+                apply_invisible(m, 1, outer_match=m)
+                apply_invisible(m, 3, outer_match=m)
             
         # Apply checkboxes (☐ or ☑)
         for m in re.finditer(r'^(\s*)([☐☑])\s*(.*)$', text, re.MULTILINE):
@@ -253,8 +267,8 @@ class NoteEditor(Gtk.Overlay):
             self.on_title_changed(self)
 
     def on_key_pressed_capture(self, controller, keyval, keycode, state):
-        if keyval == Gdk.KEY_BackSpace and not (state & (Gdk.ModifierType.CONTROL_MASK | Gdk.ModifierType.SHIFT_MASK | Gdk.ModifierType.ALT_MASK)):
-            if not self.buffer.get_has_selection():
+        if not self.buffer.get_has_selection():
+            if keyval == Gdk.KEY_BackSpace:
                 insert_mark = self.buffer.get_insert()
                 cursor_iter = self.buffer.get_iter_at_mark(insert_mark)
                 line_start = cursor_iter.copy()
@@ -265,43 +279,26 @@ class NoteEditor(Gtk.Overlay):
                 text_before = self.buffer.get_text(line_start, cursor_iter, False)
                 full_line = self.buffer.get_text(line_start, line_end, False)
                 
-                if self.is_list_note():
-                    if re.match(r'^\s*[☐☑]\s*$', text_before):
-                        if re.match(r'^\s*[☐☑]\s*$', full_line):
-                            self.buffer.delete(line_start, line_end)
-                            if line_start.backward_char() and line_start.get_char() == '\n':
-                                t = line_start.copy()
-                                t.forward_char()
-                                self.buffer.delete(line_start, t)
-                            return True
-                line_start.set_line_offset(0)
-                
-                if cursor_iter.equal(line_start):
-                    return False
-                    
-                text_before = self.buffer.get_text(line_start, cursor_iter, False)
-                if re.match(r'^\s*([-*+]|\d+\.|[☐☑])?\s*$', text_before):
-                    if self.is_list_note() and ('☐' in text_before or '☑' in text_before):
-                        line_end = cursor_iter.copy()
-                        line_end.forward_to_line_end()
-                        full_line_text = self.buffer.get_text(line_start, line_end, False)
+                # Ctrl+Backspace safeguard
+                if state & Gdk.ModifierType.CONTROL_MASK:
+                    if cursor_iter.equal(line_start):
+                        return True # Stop Ctrl+Backspace from eating the newline and going to previous line
+                    if re.match(r'^(\s*[-*+]|\s*[☐☑])\s*$', text_before):
+                        # If deleting word backward just after a bullet, delete the bullet but don't eat the newline above
+                        self.buffer.delete(line_start, cursor_iter)
+                        return True
                         
-                        if re.match(r'^\s*[☐☑]\s*$', full_line_text):
-                            if self.count_checkboxes() <= 1:
+                # Normal Backspace on empty checkbox in list note
+                elif not (state & (Gdk.ModifierType.CONTROL_MASK | Gdk.ModifierType.SHIFT_MASK | Gdk.ModifierType.ALT_MASK)):
+                    if self.is_list_note():
+                        if re.match(r'^\s*[☐☑]\s*$', text_before):
+                            if re.match(r'^\s*[☐☑]\s*$', full_line):
+                                self.buffer.delete(line_start, line_end)
+                                if line_start.backward_char() and line_start.get_char() == '\n':
+                                    t = line_start.copy()
+                                    t.forward_char()
+                                    self.buffer.delete(line_start, t)
                                 return True
-                            self.buffer.delete(line_start, line_end)
-                            if line_start.backward_char() and line_start.get_char() == '\n':
-                                tmp = line_start.copy()
-                                tmp.forward_char()
-                                self.buffer.delete(line_start, tmp)
-                            return True
-                        else:
-                            return True
-                            
-                    self.buffer.delete(line_start, cursor_iter)
-                    return True
-                return False
-                
         return False
 
     def on_key_pressed_bubble(self, controller, keyval, keycode, state):
@@ -436,13 +433,16 @@ class NoteEditor(Gtk.Overlay):
         first_line = self.buffer.get_text(start_iter, end_iter, False).strip().lower()
         is_list = (first_line in ["list", "# list", "## list", "### list"])
 
+        def insert_after_newline(text_to_insert):
+            def _idle():
+                self.buffer.insert_at_cursor(text_to_insert)
+                return False
+            GLib.idle_add(_idle)
+
         if is_list:
             # Empty checkbox
             m_empty = re.match(r'^(\s*)[☐☑]\s*$', line_text)
             if m_empty:
-                if self.count_checkboxes() <= 1:
-                    return True # Prevent deletion
-                
                 # Delete the entire line
                 line_end = cursor_iter.copy()
                 line_end.forward_to_line_end()
@@ -458,22 +458,21 @@ class NoteEditor(Gtk.Overlay):
                 
             m_indent = re.match(r'^(\s*)', line_text)
             indent = m_indent.group(1) if m_indent else ""
-            self.buffer.insert_at_cursor(f"\n{indent}☐ ")
-            return True
+            insert_after_newline(f"{indent}☐ ")
+            return False
 
         # Check if current line is an empty checkbox
         m_empty = re.match(r'^(\s*)[☐☑]\s*$', line_text)
         if m_empty:
             self.buffer.delete(line_start, cursor_iter)
-            self.buffer.insert_at_cursor("\n")
-            return True
+            return False
             
         # Check if current line is a checkbox
         m_box = re.match(r'^(\s*)([☐☑])\s+(.*)$', line_text)
         if m_box:
             indent, box, content = m_box.groups()
-            self.buffer.insert_at_cursor(f"\n{indent}☐ ")
-            return True
+            insert_after_newline(f"{indent}☐ ")
+            return False
         
         # Match unordered lists (- or *)
         m_ul = re.match(r'^(\s*)([-*+])\s+(.*)$', line_text)
@@ -481,11 +480,10 @@ class NoteEditor(Gtk.Overlay):
             indent, bullet, content = m_ul.groups()
             if not content.strip():
                 self.buffer.delete(line_start, cursor_iter)
-                self.buffer.insert_at_cursor("\n")
-                return True
+                return False
             else:
-                self.buffer.insert_at_cursor(f"\n{indent}{bullet} ")
-                return True
+                insert_after_newline(f"{indent}{bullet} ")
+                return False
                 
         # Match ordered lists (1., 2., etc)
         m_ol = re.match(r'^(\s*)(\d+)\.\s+(.*)$', line_text)
@@ -493,12 +491,11 @@ class NoteEditor(Gtk.Overlay):
             indent, num, content = m_ol.groups()
             if not content.strip():
                 self.buffer.delete(line_start, cursor_iter)
-                self.buffer.insert_at_cursor("\n")
-                return True
+                return False
             else:
                 next_num = int(num) + 1
-                self.buffer.insert_at_cursor(f"\n{indent}{next_num}. ")
-                return True
+                insert_after_newline(f"{indent}{next_num}. ")
+                return False
                 
         return False
 
@@ -651,6 +648,13 @@ class WhispWindow(Adw.ApplicationWindow):
         del_btn.add_css_class("destructive-action")
         self.header_bar.pack_end(del_btn)
         
+        # WYSIWYG Toggle Button
+        self.wysiwyg_btn = Gtk.ToggleButton(icon_name="view-reveal-symbolic")
+        self.wysiwyg_btn.set_tooltip_text("Toggle Live Formatting")
+        self.wysiwyg_btn.set_active(config.get("wysiwyg_mode", False))
+        self.wysiwyg_btn.connect("toggled", self.on_wysiwyg_toggled)
+        self.header_bar.pack_end(self.wysiwyg_btn)
+        
         # Hamburger menu
         self.menu_button = Gtk.MenuButton()
         self.menu_button.set_icon_name("open-menu-symbolic")
@@ -665,6 +669,12 @@ class WhispWindow(Adw.ApplicationWindow):
         self.carousel.set_interactive(True)
         self.carousel.connect("page-changed", self.on_page_changed)
         self.box.append(self.carousel)
+
+    def on_wysiwyg_toggled(self, btn):
+        config.set("wysiwyg_mode", btn.get_active())
+        for i in range(self.carousel.get_n_pages()):
+            editor = self.carousel.get_nth_page(i)
+            editor.highlighter.highlight()
 
     def load_notes(self):
         files = sorted(DATA_DIR.glob("*.md"), key=lambda f: os.path.getmtime(f) if f.exists() else 0, reverse=True)

@@ -1,60 +1,55 @@
-# Whisp
+<div align="center">
+  <!-- ICON PLACEHOLDER: Insert your exported SVG/PNG here -->
+  <img src="docs/assets/icon-placeholder.svg" alt="Whisp Icon" width="128" height="128">
 
-<img width="634" height="598" alt="image" src="https://github.com/user-attachments/assets/a034925d-7375-44b6-b886-b3ab4a884cc9" />
+  <h1>Whisp</h1>
+  <p><b>The Anti-Note for GNOME. A fluid, gesture-driven scratchpad designed for speed.</b></p>
 
+  <!-- BADGES PLACEHOLDER -->
+  <a href="#"><img src="https://img.shields.io/badge/Platform-GNOME-4A86CF?style=flat-square" alt="Platform: GNOME"></a>
+  <a href="#"><img src="https://img.shields.io/badge/GTK-4.0-white?style=flat-square&logo=gtk" alt="GTK4"></a>
+  <a href="#"><img src="https://img.shields.io/badge/License-GPLv3-blue?style=flat-square" alt="License: GPLv3"></a>
+  <br><br>
+</div>
 
-Whisp is a minimalist, lightning-fast, and gesture-driven note-taking application built for the GNOME desktop environment. Designed to act as a seamless desktop scratchpad, it offers distraction-free Markdown editing while blending perfectly with modern GNOME aesthetics using GTK4 and Libadwaita.
+Whisp is a minimalist, lightning-fast note-taking application built strictly for the GNOME desktop environment. It abandons traditional complex file hierarchies in favor of a spatial, swipeable canvas. Inspired by the "anti-note" philosophy, it is designed to act as a seamless desktop scratchpad offering distraction-free Markdown editing while blending perfectly with modern GNOME aesthetics using GTK4 and Libadwaita.
 
+<div align="center">
+  <!-- SCREENSHOT PLACEHOLDER: Insert main UI screenshot here -->
+  <img width="800" alt="Whisp Main Interface Placeholder" src="docs/assets/screenshot-placeholder.png" style="border-radius: 12px; border: 1px solid #333;" />
+</div>
 
-## Features
+## Core Features
 
-- **Live Markdown Highlighting**: Real-time syntax highlighting for headings, bold, italics, underlines (`<u>`), inline code blocks, bullet points, and numbered lists.
-- **Gesture Navigation**: Fluidly swipe between your recent notes using 2-finger touchpad gestures.
+- **Spatial Navigation**: Fluidly swipe between your recent notes using 1:1 touchpad gestures via Adwaita Carousel.
+- **WYSIWYG Markdown**: Real-time rendering of Markdown. Toggle WYSIWYG mode to instantly hide Markdown syntax symbols and view clean rich text.
+- **Paper Themes**: Native dynamic styling. Choose between Dotted, Grid, or Blank backgrounds to mimic physical engineering paper or scratchpads.
+- **Smart Paste**: Copy a URL and press `Ctrl+V` to automatically shrink it via TinyURL in the background, or use `Ctrl+Shift+V` to extract and paste pure plain text, actively stripping all source Markdown formatting.
 - **Keyboard-Centric Workflow**: 
-  - `Ctrl+N` to instantly create a new note from anywhere in the app.
-  - `Ctrl+B`, `Ctrl+I`, `Ctrl+U` to quickly format text in the editor.
-- **Lightning Fast Performance**: Automatically keeps only your top 10 most recently modified notes in the active carousel for instant startup, no matter how many notes you have.
-- **Robust Note Management**: A unified searchable dropdown lets you access all your notes.
-- **Tagging System**: Add hashtags (e.g., `#urgent`, `#todo`) anywhere in your note, and instantly filter by them in the search menu.
-- **Custom Storage Location**: Save your notes wherever you want via the Preferences menu—perfect for syncing with Nextcloud or Dropbox. All notes are saved as plain `.md` files.
-- **Safe Deletion**: Deleted notes aren't permanently erased; they are moved to a hidden `.trash/` folder inside your notes directory.
+  - `Ctrl+N` to instantly create a new note.
+  - `Ctrl+B`, `Ctrl+I`, `Ctrl+U` for quick text formatting.
+- **Performance Focused**: Maintains a lightweight footprint by rendering only the most recently active notes, ensuring instant startup times.
+- **Robust Management**: Search, filter by tags, and safely manage deleted files within a hidden `.trash` directory.
 
 ## Installation
 
-Whisp uses the standard Meson build system, making it easy to compile and install on any Linux distribution.
-
-### Prerequisites
-
-Ensure you have the following dependencies installed:
-- `python3`
-- `meson`
-- `ninja`
-- `python3-gi` (PyGObject)
-- `libadwaita` & `gtk4`
+Whisp uses the standard Meson build system. It is currently being packaged for Flathub.
 
 ### Building from Source
 
-1. Clone the repository and navigate into the project directory:
-   ```bash
-   git clone <your-repo-url>
-   cd Whisp
-   ```
+Dependencies required: `python3`, `meson`, `ninja`, `python3-gi`, `libadwaita`, and `gtk4`.
 
-2. Setup the build directory:
-   ```bash
-   meson setup builddir
-   ```
-
-3. Compile and install the application globally:
-   ```bash
-   sudo meson install -C builddir
-   ```
-
-Once installed, you can launch Nota directly from your application launcher (app grid), or run `nota` from the terminal.
+```bash
+git clone <your-repo-url>
+cd Whisp
+meson setup builddir
+sudo meson install -C builddir
+```
 
 ## Architecture
 
-Nota strictly follows the GNOME HIG (Human Interface Guidelines). It leverages `Adw.Carousel` for its swipeable interface and uses an elegant `Gtk.TextView` wrapper to instantly parse and decorate Markdown text using `Gtk.TextTag`.
+Whisp adheres strictly to the GNOME Human Interface Guidelines (HIG). It leverages `Adw.Carousel` for its swipeable interface and uses a highly optimized `Gtk.TextView` wrapper to instantly parse and decorate Markdown text dynamically.
 
 ## License
-Still thinking about this
+
+Pending finalization.

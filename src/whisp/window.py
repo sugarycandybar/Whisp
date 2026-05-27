@@ -280,15 +280,20 @@ class WhispWindow(Adw.ApplicationWindow):
                         
             target_editor = self.carousel.get_nth_page(target_idx)
             
-            def restore_session():
+            def restore_session(widget=None):
                 self.carousel.scroll_to(target_editor, False)
                 target_editor.textview.grab_focus()
                 buffer = target_editor.buffer
                 buffer.place_cursor(buffer.get_end_iter())
                 self.update_title()
+                if hasattr(self, '_map_sig'):
+                    self.disconnect(self._map_sig)
+                    del self._map_sig
                 return False
             
-            GLib.idle_add(restore_session)
+            self._map_sig = self.connect("map", restore_session)
+            # Fallback timeout in case it's already mapped
+            GLib.timeout_add(100, restore_session)
 
     def add_note(self, file_path=None, grab_focus=True):
         editor = NoteEditor(file_path=file_path, on_title_changed=self.on_editor_title_changed)
@@ -340,9 +345,12 @@ class WhispWindow(Adw.ApplicationWindow):
             shutil.move(str(editor.file_path), str(TRASH_DIR / editor.file_path.name))
             self.last_deleted_file = editor.file_path.name
             
-            toast = Adw.Toast.new("Note deleted")
-            toast.set_timeout(5)
-            self.toast_overlay.add_toast(toast)
+            if hasattr(self, 'current_toast') and self.current_toast:
+                self.current_toast.dismiss()
+                
+            self.current_toast = Adw.Toast.new("Note deleted")
+            self.current_toast.set_timeout(3)
+            self.toast_overlay.add_toast(self.current_toast)
             
         self.carousel.remove(editor)
         

@@ -5,13 +5,13 @@ This document outlines the development roadmap for Whisp, segmented into phases 
 ## Phase 1: Pre-Flathub Polish (Quick Wins)
 These features are designed to be high-impact, immediate improvements that finalize the core experience before publishing version 1.0 to Flathub. We will complete this phase, package the Flatpak, wait for the official icon from GNOME Designers, and publish.
 
-- [ ] **Paper Themes (Backgrounds)**
+- [-x] **Paper Themes (Backgrounds)**
   - Add native CSS styling for `Dotted`, `Grid`, and `Blank` backgrounds to mimic physical engineering paper or scratchpads.
   - Implement a "Paper Style" dropdown in the Preferences window to toggle between themes.
-- [ ] **Paste Plain Text**
+- [-x] **Paste Plain Text**
   - Intercept `Ctrl+Shift+V`.
   - Extract raw text from the GNOME Clipboard and insert it into the editor, actively stripping out any rich-text formatting.
-- [ ] **Link Shortener**
+- [-x] **Link Shortener**
   - Implement a shortcut (e.g., `Ctrl+Shift+L`) or a small UI button.
   - Quietly replace long URLs with shortened versions via a free, no-authentication API like `is.gd`.
 

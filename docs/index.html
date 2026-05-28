@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Whisp - The Anti-Note for GNOME</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -13,87 +16,70 @@
                 <div class="icon-placeholder-small"></div>
                 <span class="brand-name">Whisp</span>
             </div>
-            <div class="nav-links">
-                <a href="#features">Features</a>
-                <a href="https://github.com/tanaybhomia/Whisp" target="_blank">GitHub</a>
+            <div class="nav-links" style="display: flex; gap: 1.5rem; align-items: center;">
+                <a href="https://github.com/tanaybhomia" target="_blank" style="color: var(--text-secondary); text-decoration: none; font-weight: 600;">@tanaybhomia</a>
+                <a href="https://github.com/tanaybhomia/Whisp" target="_blank" class="btn btn-secondary">View on GitHub</a>
             </div>
         </div>
     </nav>
 
     <main>
-        <section class="hero">
-            <div class="hero-icon"></div>
-            <h1>The Anti-Note for GNOME</h1>
-            <p>A fluid, gesture-driven scratchpad designed for speed.</p>
+        <section class="hero-centered">
+            <h1>The Anti-Note for GNOME.</h1>
+            <p class="subtitle">A fluid, gesture-driven scratchpad designed for absolute speed.</p>
+            
             <div class="hero-actions">
-                <a href="#" class="btn btn-primary" style="opacity: 0.5; cursor: not-allowed;">Available Soon on Flathub</a>
-                <a href="https://github.com/tanaybhomia/Whisp#installation" class="btn btn-secondary" style="border: 1px solid var(--card-border);">Build from Source</a>
+                <a href="#" class="btn btn-primary disabled">Download on Flathub (Soon)</a>
             </div>
-            <div class="screenshot-container">
-                <img src="assets/hero.png" alt="Whisp Interface" style="max-width: 100%; height: auto;">
-            </div>
-        </section>
-
-        <section id="features" class="featured">
-            <div class="feature-block">
-                <div class="feature-text">
-                    <h2>Spatial Navigation</h2>
-                    <p>Whisp abandons traditional file hierarchies. Fluidly swipe between your recent notes using 1:1 touchpad gestures natively powered by Adwaita Carousel.</p>
-                </div>
-                <div class="feature-image-placeholder" style="background: none; border: none;">
-                    <video autoplay loop muted playsinline style="width: 100%; border-radius: 12px; border: 1px solid var(--card-border);">
-                        <source src="assets/spatial-nav.webm" type="video/webm">
-                        [Record a quick webm of swiping notes and save to docs/assets/spatial-nav.webm]
-                    </video>
-                </div>
-            </div>
-
-            <div class="feature-block reverse">
-                <div class="feature-text">
-                    <h2>WYSIWYG Markdown</h2>
-                    <p>Experience real-time rendering of your Markdown syntax. Toggle WYSIWYG mode on to instantly hide the Markdown symbols and view clean, distraction-free rich text.</p>
-                </div>
-                <div class="feature-image-placeholder" style="background: none; border: none;">
-                    <video autoplay loop muted playsinline style="width: 100%; border-radius: 12px; border: 1px solid var(--card-border);">
-                        <source src="assets/wysiwyg.webm" type="video/webm">
-                        [Record a quick webm of toggling WYSIWYG and save to docs/assets/wysiwyg.webm]
-                    </video>
-                </div>
-            </div>
-
-            <div class="feature-block">
-                <div class="feature-text">
-                    <h2>Smart Link Extraction</h2>
-                    <p>Pasting a URL automatically fetches a shortened TinyURL in the background so your notes stay clean. Need plain text? Standard extraction aggressively strips rich-text formatting on paste.</p>
-                </div>
-                <div class="feature-image-placeholder" style="background: none; border: none;">
-                    <video autoplay loop muted playsinline style="width: 100%; border-radius: 12px; border: 1px solid var(--card-border);">
-                        <source src="assets/smart-paste.webm" type="video/webm">
-                        [Record a quick webm of pasting a link and save to docs/assets/smart-paste.webm]
-                    </video>
-                </div>
+            
+            <!-- Centered Master Video -->
+            <div class="hero-video-wrapper">
+                <video autoplay loop muted playsinline class="hero-video">
+                    <source src="assets/hero-video.webm" type="video/webm">
+                    [Record a master WebM of you creating lists and typing, and save to docs/assets/hero-video.webm]
+                </video>
             </div>
         </section>
 
-        <section class="grid-section">
-            <h2>Under the Hood</h2>
-            <div class="feature-grid">
-                <div class="feature-card">
-                    <h3>Paper Themes</h3>
-                    <p>Native dynamic CSS styling. Toggle between Dotted, Grid, or Blank backgrounds to mimic physical engineering paper.</p>
+        <section class="bento-section">
+            <h2 class="section-title">Core Features</h2>
+            <div class="bento-grid">
+                
+                <div class="bento-card large">
+                    <div class="bento-content">
+                        <h3>Spatial Navigation</h3>
+                        <p>Whisp abandons traditional file hierarchies. Fluidly swipe between your recent notes using 1:1 touchpad gestures natively powered by Adwaita Carousel.</p>
+                    </div>
                 </div>
-                <div class="feature-card">
-                    <h3>Keyboard Centric</h3>
-                    <p>Never leave your keyboard. Instant shortcuts for formatting (`Ctrl+B/I/U`), lists, and instant URL shortening (`Ctrl+Shift+L`).</p>
+
+                <div class="bento-card">
+                    <div class="bento-content">
+                        <h3>WYSIWYG Markdown</h3>
+                        <p>Toggle WYSIWYG mode on to instantly hide Markdown symbols and view clean rich text.</p>
+                    </div>
                 </div>
-                <div class="feature-card">
-                    <h3>Lightning Fast</h3>
-                    <p>Whisp maintains a highly optimized footprint by exclusively rendering your active working set, ensuring instant startup times.</p>
+
+                <div class="bento-card">
+                    <div class="bento-content">
+                        <h3>Smart Extraction</h3>
+                        <p>Paste a URL and it automatically shrinks via TinyURL in the background. Pure text extraction strips formatting.</p>
+                    </div>
                 </div>
-                <div class="feature-card">
-                    <h3>Coming Next: Math Engine</h3>
-                    <p>Phase 2 is actively developing a contextual evaluator to process arithmetic line-by-line and overlay ghost-text results in the margin.</p>
+
+                <div class="bento-card wide">
+                    <div class="bento-content">
+                        <h3>Native Paper Themes</h3>
+                        <p>Select between Dotted, Grid, or Blank backgrounds to perfectly mimic the feel of a physical engineering notebook right on your desktop.</p>
+                    </div>
                 </div>
+                
+                <div class="bento-card alert-card">
+                    <div class="bento-content">
+                        <h3>Coming Soon: The Math Engine</h3>
+                        <p>Phase 2 brings a contextual evaluator that processes arithmetic line-by-line and overlays ghost-text results directly in the margins of your notes.</p>
+                    </div>
+                </div>
+
             </div>
         </section>
     </main>

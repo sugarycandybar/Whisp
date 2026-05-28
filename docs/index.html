@@ -4,14 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Whisp - The Anti-Note for GNOME</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-    <div class="background-mesh"></div>
-    
     <nav class="navbar">
         <div class="nav-content">
             <div class="brand">
@@ -20,103 +15,91 @@
             </div>
             <div class="nav-links">
                 <a href="#features">Features</a>
-                <a href="#roadmap">Roadmap</a>
-                <a href="https://github.com/tanaybhomia/Whisp" target="_blank" class="github-link">GitHub</a>
+                <a href="https://github.com/tanaybhomia/Whisp" target="_blank">GitHub</a>
             </div>
         </div>
     </nav>
 
     <main>
         <section class="hero">
-            <div class="hero-content">
-                <div class="icon-placeholder-large float-animation">
-                    <!-- Icon placeholder -->
+            <div class="hero-icon"></div>
+            <h1>The Anti-Note for GNOME</h1>
+            <p>A fluid, gesture-driven scratchpad designed for speed.</p>
+            <div class="hero-actions">
+                <a href="#" class="btn btn-primary" style="opacity: 0.5; cursor: not-allowed;">Available Soon on Flathub</a>
+                <a href="https://github.com/tanaybhomia/Whisp#installation" class="btn btn-secondary" style="border: 1px solid var(--card-border);">Build from Source</a>
+            </div>
+            <div class="screenshot-container">
+                Main Interface Screenshot Placeholder
+            </div>
+        </section>
+
+        <section id="features" class="featured">
+            <div class="feature-block">
+                <div class="feature-text">
+                    <h2>Spatial Navigation</h2>
+                    <p>Whisp abandons traditional file hierarchies. Fluidly swipe between your recent notes using 1:1 touchpad gestures natively powered by Adwaita Carousel.</p>
                 </div>
-                <h1 class="hero-title">The Anti-Note<br>for <span class="highlight-purple">GNOME</span></h1>
-                <p class="hero-subtitle">A fluid, gesture-driven scratchpad designed for speed.</p>
-                <div class="hero-cta">
-                    <a href="#" class="btn btn-primary disabled">Download on Flathub (Soon)</a>
-                    <a href="https://github.com/tanaybhomia/Whisp#installation" class="btn btn-secondary">Build from Source</a>
+                <div class="feature-image-placeholder" style="background: none; border: none;">
+                    <video autoplay loop muted playsinline style="width: 100%; border-radius: 12px; border: 1px solid var(--card-border);">
+                        <source src="assets/spatial-nav.webm" type="video/webm">
+                        [Record a quick webm of swiping notes and save to docs/assets/spatial-nav.webm]
+                    </video>
                 </div>
             </div>
-            <div class="hero-visual">
-                <div class="screenshot-placeholder">
-                    <div class="window-controls">
-                        <span class="dot"></span>
-                        <span class="dot"></span>
-                        <span class="dot"></span>
-                    </div>
-                    <div class="placeholder-text">Main Interface Screenshot</div>
+
+            <div class="feature-block reverse">
+                <div class="feature-text">
+                    <h2>WYSIWYG Markdown</h2>
+                    <p>Experience real-time rendering of your Markdown syntax. Toggle WYSIWYG mode on to instantly hide the Markdown symbols and view clean, distraction-free rich text.</p>
+                </div>
+                <div class="feature-image-placeholder" style="background: none; border: none;">
+                    <video autoplay loop muted playsinline style="width: 100%; border-radius: 12px; border: 1px solid var(--card-border);">
+                        <source src="assets/wysiwyg.webm" type="video/webm">
+                        [Record a quick webm of toggling WYSIWYG and save to docs/assets/wysiwyg.webm]
+                    </video>
+                </div>
+            </div>
+
+            <div class="feature-block">
+                <div class="feature-text">
+                    <h2>Smart Link Extraction</h2>
+                    <p>Pasting a URL automatically fetches a shortened TinyURL in the background so your notes stay clean. Need plain text? Standard extraction aggressively strips rich-text formatting on paste.</p>
+                </div>
+                <div class="feature-image-placeholder" style="background: none; border: none;">
+                    <video autoplay loop muted playsinline style="width: 100%; border-radius: 12px; border: 1px solid var(--card-border);">
+                        <source src="assets/smart-paste.webm" type="video/webm">
+                        [Record a quick webm of pasting a link and save to docs/assets/smart-paste.webm]
+                    </video>
                 </div>
             </div>
         </section>
 
-        <section id="features" class="features">
-            <div class="section-header">
-                <h2>Built for Speed. Designed for GNOME.</h2>
-                <p>Whisp abandons traditional file hierarchies in favor of a spatial, swipeable canvas.</p>
-            </div>
-            
+        <section class="grid-section">
+            <h2>Under the Hood</h2>
             <div class="feature-grid">
                 <div class="feature-card">
-                    <div class="feature-icon">gestures</div>
-                    <h3>Spatial Navigation</h3>
-                    <p>Fluidly swipe between your recent notes using 1:1 touchpad gestures via native Adwaita Carousels.</p>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon">markdown</div>
-                    <h3>WYSIWYG Markdown</h3>
-                    <p>Real-time rendering of Markdown. Toggle WYSIWYG mode to instantly hide syntax symbols and view clean rich text.</p>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon">themes</div>
                     <h3>Paper Themes</h3>
-                    <p>Native dynamic styling. Choose between Dotted, Grid, or Blank backgrounds to mimic physical scratchpads.</p>
+                    <p>Native dynamic CSS styling. Toggle between Dotted, Grid, or Blank backgrounds to mimic physical engineering paper.</p>
                 </div>
                 <div class="feature-card">
-                    <div class="feature-icon">link</div>
-                    <h3>Smart Paste</h3>
-                    <p>Paste a URL to automatically shrink it via TinyURL in the background, or use plain-text paste to strip source formatting.</p>
+                    <h3>Keyboard Centric</h3>
+                    <p>Never leave your keyboard. Instant shortcuts for formatting (`Ctrl+B/I/U`), lists, and instant URL shortening (`Ctrl+Shift+L`).</p>
                 </div>
-            </div>
-        </section>
-
-        <section id="roadmap" class="roadmap">
-            <div class="section-header">
-                <h2>The Road Ahead</h2>
-                <p>We are actively building Phase 2 of Whisp: The Reactive Math Engine.</p>
-            </div>
-            
-            <div class="roadmap-container">
-                <div class="roadmap-item">
-                    <div class="roadmap-status complete">Phase 1</div>
-                    <div class="roadmap-content">
-                        <h3>Core Editor & Polish</h3>
-                        <p>Paper themes, smart text extraction, URL shortening, and Flathub packaging.</p>
-                    </div>
+                <div class="feature-card">
+                    <h3>Lightning Fast</h3>
+                    <p>Whisp maintains a highly optimized footprint by exclusively rendering your active working set, ensuring instant startup times.</p>
                 </div>
-                <div class="roadmap-item">
-                    <div class="roadmap-status active">Phase 2</div>
-                    <div class="roadmap-content">
-                        <h3>Reactive Math Engine</h3>
-                        <p>A contextual evaluator that processes arithmetic and variables line-by-line, overlaying ghost-text results in the margin.</p>
-                    </div>
-                </div>
-                <div class="roadmap-item">
-                    <div class="roadmap-status upcoming">Phase 3</div>
-                    <div class="roadmap-content">
-                        <h3>Advanced Context</h3>
-                        <p>Unit conversions, advanced variable references across notes, and OCR extraction modules.</p>
-                    </div>
+                <div class="feature-card">
+                    <h3>Coming Next: Math Engine</h3>
+                    <p>Phase 2 is actively developing a contextual evaluator to process arithmetic line-by-line and overlay ghost-text results in the margin.</p>
                 </div>
             </div>
         </section>
     </main>
 
     <footer>
-        <div class="footer-content">
-            <p>Whisp &copy; 2026. Built with GTK4 and Libadwaita.</p>
-        </div>
+        <p>Whisp &copy; 2026. Built natively for GNOME with GTK4 and Libadwaita.</p>
     </footer>
 </body>
 </html>

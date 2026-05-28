@@ -52,4 +52,4 @@ Whisp adheres strictly to the GNOME Human Interface Guidelines (HIG). It leverag
 
 ## License
 
-Pending finalization.
+Whisp is free and open-source software licensed under the **GNU General Public License v3.0** (GPL-3.0). See the [LICENSE](LICENSE) file for more details.

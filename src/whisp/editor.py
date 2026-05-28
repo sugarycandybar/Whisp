@@ -377,26 +377,31 @@ class NoteEditor(Gtk.Overlay):
 
     def wrap_text(self, prefix, suffix, default_text):
         bounds = self.buffer.get_selection_bounds()
-        if bounds:
-            start, end = bounds
-            text = self.buffer.get_text(start, end, False)
-            self.buffer.delete(start, end)
+        if not bounds:
+            return
             
-            # Start iter might be invalid after delete, get it again
-            start = self.buffer.get_iter_at_mark(self.buffer.get_insert())
-            self.buffer.insert(start, f"{prefix}{text}{suffix}")
+        start, end = bounds
+        text = self.buffer.get_text(start, end, False)
+        self.buffer.delete(start, end)
+        
+        start = self.buffer.get_iter_at_mark(self.buffer.get_insert())
+        
+        # Check if the text is already wrapped
+        if text.startswith(prefix) and text.endswith(suffix) and len(text) >= len(prefix) + len(suffix):
+            # Toggle off (unwrap)
+            new_text = text[len(prefix):-len(suffix)]
         else:
-            start = self.buffer.get_iter_at_mark(self.buffer.get_insert())
-            self.buffer.insert(start, f"{prefix}{default_text}{suffix}")
+            # Toggle on (wrap)
+            new_text = f"{prefix}{text}{suffix}"
             
-            # Select the default text
-            insert_iter = self.buffer.get_iter_at_mark(self.buffer.get_insert())
-            insert_iter.backward_chars(len(suffix) + len(default_text))
-            
-            bound_iter = insert_iter.copy()
-            bound_iter.forward_chars(len(default_text))
-            
-            self.buffer.select_range(insert_iter, bound_iter)
+        self.buffer.insert(start, new_text)
+        
+        # Re-select the newly modified text
+        insert_iter = self.buffer.get_iter_at_mark(self.buffer.get_insert())
+        insert_iter.backward_chars(len(new_text))
+        bound_iter = insert_iter.copy()
+        bound_iter.forward_chars(len(new_text))
+        self.buffer.select_range(insert_iter, bound_iter)
 
     def handle_smart_paste(self):
         clipboard = self.textview.get_clipboard()

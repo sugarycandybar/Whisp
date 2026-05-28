@@ -15,8 +15,7 @@
 Whisp is a minimalist, lightning-fast note-taking application built strictly for the GNOME desktop environment. It abandons traditional complex file hierarchies in favor of a spatial, swipeable canvas. Inspired by the "anti-note" philosophy, it is designed to act as a seamless desktop scratchpad offering distraction-free Markdown editing while blending perfectly with modern GNOME aesthetics using GTK4 and Libadwaita.
 
 <div align="center">
-  <!-- SCREENSHOT PLACEHOLDER: Insert main UI screenshot here -->
-  <img width="800" alt="Whisp Main Interface Placeholder" src="docs/assets/screenshot-placeholder.png" style="border-radius: 12px; border: 1px solid #333;" />
+  <img width="800" alt="Whisp Main Interface" src="docs/assets/hero.png" />
 </div>
 
 ## Core Features

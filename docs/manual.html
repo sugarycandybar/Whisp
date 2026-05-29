@@ -60,10 +60,10 @@
                     <li>Alternatively, click on the edges of the window or use the scroll wheel to navigate.</li>
                 </ul>
                 <div class="shortcut-box">
-                    <kbd>Swipe Left</kbd> Go to previous note
+                    <kbd>Swipe Left</kbd> or <kbd>Ctrl</kbd> + <kbd>[</kbd> Go to previous note
                 </div>
                 <div class="shortcut-box">
-                    <kbd>Swipe Right</kbd> Go to next note
+                    <kbd>Swipe Right</kbd> or <kbd>Ctrl</kbd> + <kbd>]</kbd> Go to next note
                 </div>
             </section>
 
@@ -135,9 +135,10 @@
             <section id="nav-lists" class="manual-section">
                 <h2>Smart Lists</h2>
                 <ul>
-                    <li>Start a line with <code>-</code>, <code>*</code>, or <code>1.</code> to begin a list.</li>
-                    <li>Pressing Enter will automatically insert the next bullet point or correctly increment the number.</li>
-                    <li>Pressing Enter on an empty list item will automatically delete it and exit the list.</li>
+                    <li>Type <code>list</code> or <code>list: Custom Title</code> at the top of your note to activate List Mode.</li>
+                    <li>Pressing Enter will automatically spawn a new <code>☐</code> checkbox on the next line.</li>
+                    <li><strong>Smart Overwrite:</strong> Type <code>#</code> on an empty checkbox to instantly turn it into a heading.</li>
+                    <li><strong>Comments:</strong> Type <code>//</code> at the start of a list item to visually fade it out as a comment.</li>
                 </ul>
                 <div class="shortcut-box">
                     <kbd>Tab</kbd> Indent list item
@@ -164,7 +165,9 @@
                 <h2>Smart Paste (URL)</h2>
                 <ul>
                     <li>Dropping massive tracking URLs ruins the visual flow of a note.</li>
-                    <li>Use the Smart Paste shortcut when pasting a long URL to automatically ping the TinyURL API in the background and insert a short, clean link instead.</li>
+                    <li>Use the Smart Paste shortcut when pasting a long URL. Whisp will analyze it locally, generate a clean, short visual label, and format it securely in Markdown.</li>
+                    <li>Turn on WYSIWYG Mode and the ugly Markdown syntax dynamically vanishes, leaving only the tiny link!</li>
+                    <li><em>100% offline and privacy-respecting. No external APIs used.</em></li>
                 </ul>
                 <div class="shortcut-box">
                     <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>L</kbd> Smart URL Paste

@@ -33,8 +33,8 @@
             </div>
             
             <!-- Centered Master Image -->
-            <div class="hero-video-wrapper">
-                <img src="assets/hero.png" alt="Whisp Interface" class="hero-video">
+            <div class="hero-image-wrapper">
+                <img src="assets/hero.png" alt="Whisp Interface" class="hero-image">
             </div>
         </section>
 
@@ -79,10 +79,195 @@
 
             </div>
         </section>
+
+        <section class="carousel-section">
+            <h2 class="section-title">Explore the interface</h2>
+            <div class="carousel-container">
+                <button class="carousel-btn prev-btn">&lt;</button>
+                <div class="carousel-track-container">
+                    <ul class="carousel-track">
+                        <li class="carousel-slide current-slide">
+                            <img src="assets/secondhero.png" alt="Main Interface" class="slide-image">
+                            <p class="slide-caption">Main Interface</p>
+                        </li>
+                        <li class="carousel-slide">
+                            <div class="theme-slider-wrapper">
+                                <img src="assets/wysiwyg-off.png" alt="Markdown Source" class="slider-img">
+                                <img src="assets/wysiwyg-on.png" alt="WYSIWYG Mode" class="slider-img slider-img-overlay" id="wysiwyg-overlay">
+                                <div class="slider-line" id="wysiwyg-line"></div>
+                                <input type="range" min="0" max="100" value="50" class="slider-range" id="wysiwyg-range">
+                            </div>
+                            <p class="slide-caption">WYSIWYG Mode</p>
+                        </li>
+                        <li class="carousel-slide">
+                            <div class="theme-slider-wrapper">
+                                <img src="assets/long-url.png" alt="Long URL Paste" class="slider-img">
+                                <img src="assets/tiny-url.png" alt="TinyURL Extraction" class="slider-img slider-img-overlay" id="url-overlay">
+                                <div class="slider-line" id="url-line"></div>
+                                <input type="range" min="0" max="100" value="50" class="slider-range" id="url-range">
+                            </div>
+                            <p class="slide-caption">Smart Link Extraction</p>
+                        </li>
+                        <li class="carousel-slide">
+                            <img src="assets/carousel-4.png" alt="Plain Text Paste" class="slide-image">
+                            <p class="slide-caption">Plain Text Paste</p>
+                        </li>
+                        <li class="carousel-slide">
+                            <div class="theme-slider-wrapper">
+                                <img src="assets/theme-grid.png" alt="Grid Theme" class="slider-img">
+                                <img src="assets/theme-dotted.png" alt="Dotted Theme" class="slider-img slider-img-overlay" id="theme-overlay">
+                                <div class="slider-line" id="theme-line"></div>
+                                <input type="range" min="0" max="100" value="50" class="slider-range" id="theme-range">
+                            </div>
+                            <p class="slide-caption">Native Paper Themes</p>
+                        </li>
+                    </ul>
+                </div>
+                <button class="carousel-btn next-btn">&gt;</button>
+            </div>
+            <div class="carousel-nav">
+                <button class="carousel-indicator current-indicator"></button>
+                <button class="carousel-indicator"></button>
+                <button class="carousel-indicator"></button>
+                <button class="carousel-indicator"></button>
+                <button class="carousel-indicator"></button>
+            </div>
+        </section>
     </main>
 
     <footer>
         <p>Whisp &copy; 2026. Built natively for GNOME with GTK4 and Libadwaita.</p>
     </footer>
+
+    <script>
+        const track = document.querySelector('.carousel-track');
+        const slides = Array.from(track.children);
+        const nextButton = document.querySelector('.next-btn');
+        const prevButton = document.querySelector('.prev-btn');
+        const dotsNav = document.querySelector('.carousel-nav');
+        const dots = Array.from(dotsNav.children);
+
+        const slideWidth = slides[0].getBoundingClientRect().width;
+
+        // Arrange slides next to one another
+        const setSlidePosition = (slide, index) => {
+            slide.style.left = slideWidth * index + 'px';
+        };
+        slides.forEach(setSlidePosition);
+
+        const moveToSlide = (track, currentSlide, targetSlide) => {
+            track.style.transform = 'translateX(-' + targetSlide.style.left + ')';
+            currentSlide.classList.remove('current-slide');
+            targetSlide.classList.add('current-slide');
+        }
+
+        const updateDots = (currentDot, targetDot) => {
+            currentDot.classList.remove('current-indicator');
+            targetDot.classList.add('current-indicator');
+        }
+
+        prevButton.addEventListener('click', e => {
+            const currentSlide = track.querySelector('.current-slide');
+            const prevSlide = currentSlide.previousElementSibling;
+            if(prevSlide) {
+                const currentDot = dotsNav.querySelector('.current-indicator');
+                const prevDot = currentDot.previousElementSibling;
+                moveToSlide(track, currentSlide, prevSlide);
+                updateDots(currentDot, prevDot);
+            }
+        });
+
+        nextButton.addEventListener('click', e => {
+            const currentSlide = track.querySelector('.current-slide');
+            const nextSlide = currentSlide.nextElementSibling;
+            if(nextSlide) {
+                const currentDot = dotsNav.querySelector('.current-indicator');
+                const nextDot = currentDot.nextElementSibling;
+                moveToSlide(track, currentSlide, nextSlide);
+                updateDots(currentDot, nextDot);
+            }
+        });
+
+        dotsNav.addEventListener('click', e => {
+            const targetDot = e.target.closest('button');
+            if (!targetDot) return;
+            const currentSlide = track.querySelector('.current-slide');
+            const currentDot = dotsNav.querySelector('.current-indicator');
+            const targetIndex = dots.findIndex(dot => dot === targetDot);
+            const targetSlide = slides[targetIndex];
+            
+            moveToSlide(track, currentSlide, targetSlide);
+            updateDots(currentDot, targetDot);
+        });
+
+        // Theme Slider Logic
+        const themeRange = document.getElementById('theme-range');
+        const themeOverlay = document.getElementById('theme-overlay');
+        const themeLine = document.getElementById('theme-line');
+
+        if (themeRange && themeOverlay && themeLine) {
+            themeRange.addEventListener('input', (e) => {
+                const val = e.target.value;
+                themeOverlay.style.clipPath = `polygon(0 0, ${val}% 0, ${val}% 100%, 0 100%)`;
+                themeLine.style.left = `${val}%`;
+            });
+        }
+
+        // WYSIWYG Slider Logic
+        const wysiwygRange = document.getElementById('wysiwyg-range');
+        const wysiwygOverlay = document.getElementById('wysiwyg-overlay');
+        const wysiwygLine = document.getElementById('wysiwyg-line');
+
+        if (wysiwygRange && wysiwygOverlay && wysiwygLine) {
+            wysiwygRange.addEventListener('input', (e) => {
+                const val = e.target.value;
+                wysiwygOverlay.style.clipPath = `polygon(0 0, ${val}% 0, ${val}% 100%, 0 100%)`;
+                wysiwygLine.style.left = `${val}%`;
+            });
+        }
+
+        // URL Slider Logic
+        const urlRange = document.getElementById('url-range');
+        const urlOverlay = document.getElementById('url-overlay');
+        const urlLine = document.getElementById('url-line');
+
+        if (urlRange && urlOverlay && urlLine) {
+            urlRange.addEventListener('input', (e) => {
+                const val = e.target.value;
+                urlOverlay.style.clipPath = `polygon(0 0, ${val}% 0, ${val}% 100%, 0 100%)`;
+                urlLine.style.left = `${val}%`;
+            });
+        }
+
+        // 3D Parallax Tilt Effect for Hero Image
+        const heroWrapper = document.querySelector('.hero-image-wrapper');
+        const heroImg = document.querySelector('.hero-image');
+
+        if (heroWrapper && heroImg) {
+            heroWrapper.addEventListener('mousemove', (e) => {
+                const rect = heroWrapper.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                
+                const centerX = rect.width / 2;
+                const centerY = rect.height / 2;
+                
+                // Max 10 deg tilt
+                const rotateX = ((y - centerY) / centerY) * -10; 
+                const rotateY = ((x - centerX) / centerX) * 10;
+                
+                heroImg.style.transform = `scale(1.05) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
+            });
+
+            heroWrapper.addEventListener('mouseleave', () => {
+                heroImg.style.transform = 'scale(1) rotateX(0) rotateY(0)';
+                heroImg.style.transition = 'transform 0.5s ease-out';
+            });
+
+            heroWrapper.addEventListener('mouseenter', () => {
+                heroImg.style.transition = 'transform 0.1s ease-out';
+            });
+        }
+    </script>
 </body>
 </html>

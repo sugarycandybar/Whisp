@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Manual - Whisp</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="manual-page">
+
+    <div class="manual-layout">
+        <aside class="manual-sidebar">
+            <a href="index.html" class="back-link">← Back to Whisp</a>
+            
+            <div class="nav-group">
+                <h3>Basics</h3>
+                <a href="#nav-navigation">Navigation</a>
+                <a href="#nav-create">Creating Notes</a>
+                <a href="#nav-delete">Deleting Notes</a>
+                <a href="#nav-search">Search</a>
+            </div>
+
+            <div class="nav-group">
+                <h3>Editor</h3>
+                <a href="#nav-markdown">Markdown Formatting</a>
+                <a href="#nav-wysiwyg">WYSIWYG Mode</a>
+                <a href="#nav-lists">Smart Lists</a>
+                <a href="#nav-checkbox">Checkboxes</a>
+            </div>
+
+            <div class="nav-group">
+                <h3>Advanced</h3>
+                <a href="#nav-smartpaste">Smart Paste (URL)</a>
+                <a href="#nav-plainpaste">Plain Text Paste</a>
+            </div>
+
+            <div class="nav-group">
+                <h3>Customization</h3>
+                <a href="#nav-themes">Paper Themes</a>
+                <a href="#nav-typography">Typography</a>
+            </div>
+        </aside>
+
+        <main class="manual-content">
+            <header class="manual-header">
+                <span class="version-badge">Updated for v1.0.0</span>
+                <h1>User Manual</h1>
+                <div class="intent-banner">
+                    <strong>Design Intent:</strong> Prioritize the present moment above organization or recall. Navigating Whisp should feel like dancing in your short-term memory.
+                </div>
+            </header>
+
+            <section id="nav-navigation" class="manual-section">
+                <h2>Navigation</h2>
+                <ul>
+                    <li>Two-finger swipe left or right on your touchpad to smoothly transition between notes.</li>
+                    <li>Alternatively, click on the edges of the window or use the scroll wheel to navigate.</li>
+                </ul>
+                <div class="shortcut-box">
+                    <kbd>Swipe Left</kbd> Go to previous note
+                </div>
+                <div class="shortcut-box">
+                    <kbd>Swipe Right</kbd> Go to next note
+                </div>
+            </section>
+
+            <section id="nav-create" class="manual-section">
+                <h2>Creating Notes</h2>
+                <ul>
+                    <li>Swiping past the latest (right-most) note will automatically spawn a fresh, blank note.</li>
+                    <li>You can also explicitly create a new note at any time using a keyboard shortcut.</li>
+                </ul>
+                <div class="shortcut-box">
+                    <kbd>Ctrl</kbd> + <kbd>N</kbd> Create new note
+                </div>
+            </section>
+
+            <section id="nav-delete" class="manual-section">
+                <h2>Deleting Notes</h2>
+                <ul>
+                    <li>Deleting a note removes it from the main view and moves it to a hidden <code>.trash</code> directory.</li>
+                    <li>If you accidentally delete a note, you can instantly undo it.</li>
+                </ul>
+                <div class="shortcut-box">
+                    <kbd>Ctrl</kbd> + <kbd>Delete</kbd> Delete current note
+                </div>
+                <div class="shortcut-box">
+                    <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>T</kbd> Undo last deletion
+                </div>
+            </section>
+
+            <section id="nav-search" class="manual-section">
+                <h2>Search</h2>
+                <ul>
+                    <li>Instantly search through all your notes. Clicking a search result immediately jumps you to that note.</li>
+                </ul>
+                <div class="shortcut-box">
+                    <kbd>Ctrl</kbd> + <kbd>F</kbd> Open global search
+                </div>
+            </section>
+
+            <hr>
+
+            <section id="nav-markdown" class="manual-section">
+                <h2>Markdown Formatting</h2>
+                <ul>
+                    <li>Whisp supports standard Markdown for fast formatting, but powers it up with smart keyboard toggles.</li>
+                    <li>Highlight text and press a shortcut to wrap it. Press it again to unwrap it.</li>
+                </ul>
+                <div class="shortcut-box">
+                    <kbd>Ctrl</kbd> + <kbd>B</kbd> Toggle <strong>**bold**</strong>
+                </div>
+                <div class="shortcut-box">
+                    <kbd>Ctrl</kbd> + <kbd>I</kbd> Toggle <em>*italic*</em>
+                </div>
+                <div class="shortcut-box">
+                    <kbd>Ctrl</kbd> + <kbd>U</kbd> Toggle <u>&lt;u&gt;underline&lt;/u&gt;</u>
+                </div>
+            </section>
+
+            <section id="nav-wysiwyg" class="manual-section">
+                <h2>WYSIWYG Mode</h2>
+                <ul>
+                    <li>Tired of looking at Markdown syntax? Toggle the live formatting view (the eye icon).</li>
+                    <li>All markdown symbols dynamically disappear when your cursor leaves the line, leaving behind beautiful rich text.</li>
+                </ul>
+                <div class="shortcut-box">
+                    <kbd>Ctrl</kbd> + <kbd>E</kbd> Toggle WYSIWYG Mode
+                </div>
+            </section>
+
+            <section id="nav-lists" class="manual-section">
+                <h2>Smart Lists</h2>
+                <ul>
+                    <li>Start a line with <code>-</code>, <code>*</code>, or <code>1.</code> to begin a list.</li>
+                    <li>Pressing Enter will automatically insert the next bullet point or correctly increment the number.</li>
+                    <li>Pressing Enter on an empty list item will automatically delete it and exit the list.</li>
+                </ul>
+                <div class="shortcut-box">
+                    <kbd>Tab</kbd> Indent list item
+                </div>
+                <div class="shortcut-box">
+                    <kbd>Shift</kbd> + <kbd>Tab</kbd> Outdent list item
+                </div>
+            </section>
+
+            <section id="nav-checkbox" class="manual-section">
+                <h2>Checkboxes</h2>
+                <ul>
+                    <li>Whisp uses native unicode checkboxes (<code>☐</code> and <code>☑</code>) to keep your lists minimal and portable.</li>
+                    <li>Use the shortcut anywhere on a line to instantly insert or toggle a checkbox.</li>
+                </ul>
+                <div class="shortcut-box">
+                    <kbd>Ctrl</kbd> + <kbd>S</kbd> Insert / Toggle checkbox
+                </div>
+            </section>
+
+            <hr>
+
+            <section id="nav-smartpaste" class="manual-section">
+                <h2>Smart Paste (URL)</h2>
+                <ul>
+                    <li>Dropping massive tracking URLs ruins the visual flow of a note.</li>
+                    <li>Use the Smart Paste shortcut when pasting a long URL to automatically ping the TinyURL API in the background and insert a short, clean link instead.</li>
+                </ul>
+                <div class="shortcut-box">
+                    <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>L</kbd> Smart URL Paste
+                </div>
+            </section>
+
+            <section id="nav-plainpaste" class="manual-section">
+                <h2>Plain Text Paste</h2>
+                <ul>
+                    <li>Pasting text from the web often brings along unwanted markdown syntax.</li>
+                    <li>Use Plain Paste to aggressively strip all markdown symbols (headers, bold, italics, links, lists) before dropping the raw text into your note.</li>
+                </ul>
+                <div class="shortcut-box">
+                    <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>V</kbd> Plain text paste
+                </div>
+            </section>
+
+            <hr>
+
+            <section id="nav-themes" class="manual-section">
+                <h2>Paper Themes</h2>
+                <ul>
+                    <li>Customize the aesthetic of your notes by opening Preferences.</li>
+                    <li>Whisp supports three minimalist native backgrounds: <strong>Blank</strong>, <strong>Dotted</strong>, and <strong>Grid</strong>.</li>
+                </ul>
+            </section>
+
+            <section id="nav-typography" class="manual-section">
+                <h2>Typography</h2>
+                <ul>
+                    <li>You have complete control over the editor font through the Preferences menu.</li>
+                    <li>Adjust the Line Spacing (1.0 to 2.0) to give your text more breathing room.</li>
+                </ul>
+                <div class="shortcut-box">
+                    <kbd>Ctrl</kbd> + <kbd>,</kbd> Open Preferences
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script>
+        // Simple active state observer for sidebar navigation
+        const sections = document.querySelectorAll('.manual-section');
+        const navLinks = document.querySelectorAll('.manual-sidebar a:not(.back-link)');
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    navLinks.forEach(link => {
+                        link.classList.remove('active');
+                        if (link.getAttribute('href') === '#' + entry.target.id) {
+                            link.classList.add('active');
+                        }
+                    });
+                }
+            });
+        }, { rootMargin: '-20% 0px -80% 0px' });
+
+        sections.forEach(section => observer.observe(section));
+        
+        // Smooth scrolling
+        navLinks.forEach(link => {
+            link.addEventListener('click', function(e) {
+                e.preventDefault();
+                const targetId = this.getAttribute('href');
+                const targetSection = document.querySelector(targetId);
+                targetSection.scrollIntoView({ behavior: 'smooth' });
+                history.pushState(null, null, targetId);
+            });
+        });
+    </script>
+</body>
+</html>

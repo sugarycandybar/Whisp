@@ -38,6 +38,18 @@ shortcuts_xml = """
             </child>
             <child>
               <object class="GtkShortcutsShortcut">
+                <property name="title">Previous Note</property>
+                <property name="accelerator">&lt;Primary&gt;bracketleft</property>
+              </object>
+            </child>
+            <child>
+              <object class="GtkShortcutsShortcut">
+                <property name="title">Next Note</property>
+                <property name="accelerator">&lt;Primary&gt;bracketright</property>
+              </object>
+            </child>
+            <child>
+              <object class="GtkShortcutsShortcut">
                 <property name="title">Preferences</property>
                 <property name="accelerator">&lt;Primary&gt;comma</property>
               </object>
@@ -167,6 +179,14 @@ class WhispWindow(Adw.ApplicationWindow):
         pref_action.connect("activate", self.on_preferences)
         self.add_action(pref_action)
         
+        nav_next_action = Gio.SimpleAction.new("nav-next", None)
+        nav_next_action.connect("activate", self.on_nav_next)
+        self.add_action(nav_next_action)
+        
+        nav_prev_action = Gio.SimpleAction.new("nav-prev", None)
+        nav_prev_action.connect("activate", self.on_nav_prev)
+        self.add_action(nav_prev_action)
+        
         wysiwyg_action = Gio.SimpleAction.new("toggle-wysiwyg", None)
         wysiwyg_action.connect("activate", self.on_wysiwyg_shortcut)
         self.add_action(wysiwyg_action)
@@ -237,6 +257,26 @@ class WhispWindow(Adw.ApplicationWindow):
         self.carousel.set_interactive(True)
         self.carousel.connect("page-changed", self.on_page_changed)
         self.box.append(self.carousel)
+
+    def on_nav_next(self, action=None, param=None):
+        n_pages = self.carousel.get_n_pages()
+        if n_pages == 0:
+            return
+        current = int(round(self.carousel.get_position()))
+        if current < n_pages - 1:
+            editor = self.carousel.get_nth_page(current + 1)
+            self.carousel.scroll_to(editor, True)
+            GLib.idle_add(lambda: [editor.textview.grab_focus(), False][-1])
+            
+    def on_nav_prev(self, action=None, param=None):
+        n_pages = self.carousel.get_n_pages()
+        if n_pages == 0:
+            return
+        current = int(round(self.carousel.get_position()))
+        if current > 0:
+            editor = self.carousel.get_nth_page(current - 1)
+            self.carousel.scroll_to(editor, True)
+            GLib.idle_add(lambda: [editor.textview.grab_focus(), False][-1])
 
     def on_wysiwyg_toggled(self, btn):
         config.set("wysiwyg_mode", btn.get_active())

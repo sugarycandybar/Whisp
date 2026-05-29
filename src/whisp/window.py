@@ -280,20 +280,18 @@ class WhispWindow(Adw.ApplicationWindow):
                         
             target_editor = self.carousel.get_nth_page(target_idx)
             
-            def restore_session(widget=None):
+            def restore_session():
                 self.carousel.scroll_to(target_editor, False)
                 target_editor.textview.grab_focus()
                 buffer = target_editor.buffer
                 buffer.place_cursor(buffer.get_end_iter())
                 self.update_title()
-                if hasattr(self, '_map_sig'):
-                    self.disconnect(self._map_sig)
-                    del self._map_sig
                 return False
             
-            self._map_sig = self.connect("map", restore_session)
-            # Fallback timeout in case it's already mapped
-            GLib.timeout_add(100, restore_session)
+            GLib.idle_add(restore_session)
+            GLib.timeout_add(50, restore_session)
+            GLib.timeout_add(200, restore_session)
+            GLib.timeout_add(500, restore_session)
 
     def add_note(self, file_path=None, grab_focus=True):
         editor = NoteEditor(file_path=file_path, on_title_changed=self.on_editor_title_changed)

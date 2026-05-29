@@ -378,6 +378,29 @@ class NoteEditor(Gtk.Overlay):
     def wrap_text(self, prefix, suffix, default_text):
         bounds = self.buffer.get_selection_bounds()
         if not bounds:
+            insert_iter = self.buffer.get_iter_at_mark(self.buffer.get_insert())
+            
+            check_start = insert_iter.copy()
+            check_start.backward_chars(len(prefix))
+            check_end = insert_iter.copy()
+            check_end.forward_chars(len(suffix))
+            
+            text_before = self.buffer.get_text(check_start, insert_iter, False)
+            text_after = self.buffer.get_text(insert_iter, check_end, False)
+            
+            if text_before == prefix and text_after == suffix:
+                self.buffer.delete(check_start, check_end)
+                return
+                
+            if text_after == suffix:
+                insert_iter.forward_chars(len(suffix))
+                self.buffer.place_cursor(insert_iter)
+                return
+                
+            self.buffer.insert(insert_iter, prefix + suffix)
+            insert_iter = self.buffer.get_iter_at_mark(self.buffer.get_insert())
+            insert_iter.backward_chars(len(suffix))
+            self.buffer.place_cursor(insert_iter)
             return
             
         start, end = bounds

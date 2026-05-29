@@ -436,30 +436,11 @@ class NoteEditor(Gtk.Overlay):
             if text:
                 url = text.strip()
                 if re.match(r'^https?://[^\s]+$', url) and len(url) > 30:
-                    def do_insert_and_shorten():
-                        # We must create marks before insertion
-                        insert_iter = self.buffer.get_iter_at_mark(self.buffer.get_insert())
-                        start_mark = self.buffer.create_mark(None, insert_iter, True)
-                        self.buffer.insert_at_cursor(url)
-                        end_mark = self.buffer.create_mark(None, self.buffer.get_iter_at_mark(self.buffer.get_insert()), False)
-                        
-                        def fetch_short_link():
-                            try:
-                                import urllib.request, urllib.parse
-                                encoded_url = urllib.parse.quote(url)
-                                api_url = f"https://tinyurl.com/api-create.php?url={encoded_url}"
-                                req = urllib.request.Request(api_url, headers={'User-Agent': 'Mozilla/5.0'})
-                                with urllib.request.urlopen(req, timeout=5) as response:
-                                    short_url = response.read().decode('utf-8')
-                                    GLib.idle_add(self.replace_mark_range, start_mark, end_mark, short_url)
-                            except Exception:
-                                pass
-                        
-                        import threading
-                        threading.Thread(target=fetch_short_link, daemon=True).start()
-                        return False
-                    
-                    GLib.idle_add(do_insert_and_shorten)
+                    display_url = url.replace("https://", "").replace("http://", "").replace("www.", "")
+                    if len(display_url) > 25:
+                        display_url = display_url[:25] + "..."
+                    markdown_link = f"[{display_url}]({url})"
+                    GLib.idle_add(lambda: self.buffer.insert_at_cursor(markdown_link) or False)
                 else:
                     GLib.idle_add(lambda: self.buffer.insert_at_cursor(text) or False)
         except GLib.Error:
@@ -516,24 +497,15 @@ class NoteEditor(Gtk.Overlay):
                     
             url = self.buffer.get_text(start, end, False).strip()
             
-        if re.match(r'^https?://', url):
+        if re.match(r'^https?://[^\s]+$', url) and len(url) > 30:
+            display_url = url.replace("https://", "").replace("http://", "").replace("www.", "")
+            if len(display_url) > 25:
+                display_url = display_url[:25] + "..."
+            markdown_link = f"[{display_url}]({url})"
+            
             start_mark = self.buffer.create_mark(None, start, True)
             end_mark = self.buffer.create_mark(None, end, False)
-            
-            def fetch_short_link():
-                try:
-                    import urllib.request, urllib.parse
-                    encoded_url = urllib.parse.quote(url)
-                    api_url = f"https://tinyurl.com/api-create.php?url={encoded_url}"
-                    req = urllib.request.Request(api_url, headers={'User-Agent': 'Mozilla/5.0'})
-                    with urllib.request.urlopen(req, timeout=5) as response:
-                        short_url = response.read().decode('utf-8')
-                        GLib.idle_add(self.replace_mark_range, start_mark, end_mark, short_url)
-                except Exception as e:
-                    pass
-            
-            import threading
-            threading.Thread(target=fetch_short_link, daemon=True).start()
+            GLib.idle_add(self.replace_mark_range, start_mark, end_mark, markdown_link)
 
     def replace_mark_range(self, start_mark, end_mark, new_text):
         start = self.buffer.get_iter_at_mark(start_mark)

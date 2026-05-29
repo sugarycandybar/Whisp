@@ -151,8 +151,27 @@ class MarkdownHighlighter:
             if m.group(2) == '☑':
                 self.buffer.apply_tag(self.tag_checkbox_checked, box_start, line_end)
 
-        # Apply link formatting
-        for m in re.finditer(r'https?://[^\s]+', text):
+        # Apply link formatting for Markdown links [text](url)
+        for m in re.finditer(r'\[(.*?)\]\((.*?)\)', text):
+            text_start = self.buffer.get_iter_at_offset(m.start(1))
+            text_end = self.buffer.get_iter_at_offset(m.end(1))
+            self.buffer.apply_tag(self.tag_link, text_start, text_end)
+            
+            if wysiwyg:
+                # If cursor is not on the link, hide everything except the text
+                if not (m.start(0) <= cursor_offset <= m.end(0)):
+                    # Hide '['
+                    start_iter = self.buffer.get_iter_at_offset(m.start(0))
+                    end_iter = self.buffer.get_iter_at_offset(m.start(1))
+                    self.buffer.apply_tag(self.tag_invisible, start_iter, end_iter)
+                    
+                    # Hide '](url)'
+                    start_iter = self.buffer.get_iter_at_offset(m.end(1))
+                    end_iter = self.buffer.get_iter_at_offset(m.end(0))
+                    self.buffer.apply_tag(self.tag_invisible, start_iter, end_iter)
+
+        # Apply link formatting for bare URLs
+        for m in re.finditer(r'(?<!\()https?://[^\s]+', text):
             start_iter = self.buffer.get_iter_at_offset(m.start())
             end_iter = self.buffer.get_iter_at_offset(m.end())
             self.buffer.apply_tag(self.tag_link, start_iter, end_iter)

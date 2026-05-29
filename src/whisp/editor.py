@@ -85,8 +85,18 @@ class NoteEditor(Gtk.Overlay):
                                 if line_start.backward_char() and line_start.get_char() == '\n':
                                     t = line_start.copy()
                                     t.forward_char()
-                                    self.buffer.delete(line_start, t)
-                                return True
+            # Smart Checkbox Overwrite (# only)
+            elif keyval == Gdk.KEY_numbersign:
+                insert_mark = self.buffer.get_insert()
+                cursor_iter = self.buffer.get_iter_at_mark(insert_mark)
+                line_start = cursor_iter.copy()
+                line_start.set_line_offset(0)
+                text_before = self.buffer.get_text(line_start, cursor_iter, False)
+                
+                if self.is_list_note() and re.match(r'^\s*[☐☑]\s*$', text_before):
+                    self.buffer.delete(line_start, cursor_iter)
+                    # Return False so GTK proceeds to insert the typed character natively
+                    pass
                                 
             if state & Gdk.ModifierType.CONTROL_MASK:
                 if state & Gdk.ModifierType.SHIFT_MASK:
@@ -294,14 +304,14 @@ class NoteEditor(Gtk.Overlay):
     def is_empty(self):
         start, end = self.buffer.get_bounds()
         text = self.buffer.get_text(start, end, False).strip()
-        return len(text) == 0 or text.lower() == "list"
+        return len(text) == 0 or bool(re.match(r'^(#{1,6}\s*)?list(\s*[:\s].*)?$', text.lower()))
 
     def is_list_note(self):
         start_iter = self.buffer.get_start_iter()
         end_iter = start_iter.copy()
         end_iter.forward_to_line_end()
         first_line = self.buffer.get_text(start_iter, end_iter, False).strip().lower()
-        return first_line in ["list", "# list", "## list", "### list"]
+        return bool(re.match(r'^(#{1,6}\s*)?list(\s*[:\s].*)?$', first_line))
 
     def handle_return(self):
         insert_mark = self.buffer.get_insert()

@@ -40,6 +40,9 @@ class MarkdownHighlighter:
         self.tag_bullet = self.buffer.create_tag("bullet", indent=-15, left_margin=30)
         self.tag_bullet_bold = self.buffer.create_tag("bullet_bold", weight=Pango.Weight.BOLD)
         
+        # Comments
+        self.tag_comment = self.buffer.create_tag("comment", foreground="#888888", style=Pango.Style.ITALIC)
+        
         # Invisible tag for WYSIWYG
         self.tag_invisible = self.buffer.create_tag("invisible", invisible=True)
 
@@ -85,7 +88,7 @@ class MarkdownHighlighter:
         end_doc = start_doc.copy()
         end_doc.forward_to_line_end()
         first_line = self.buffer.get_text(start_doc, end_doc, False).strip().lower()
-        is_list_note = first_line in ["list", "# list", "## list", "### list"]
+        is_list_note = bool(re.match(r'^(#{1,6}\s*)?list(\s*[:\s].*)?$', first_line))
         
         if is_list_note:
             self.buffer.apply_tag(self.tag_list_keyword, start_doc, end_doc)
@@ -181,5 +184,11 @@ class MarkdownHighlighter:
             start_iter = self.buffer.get_iter_at_offset(m.start())
             end_iter = self.buffer.get_iter_at_offset(m.end())
             self.buffer.apply_tag(self.tag_code, start_iter, end_iter)
+            
+        # Apply comments (// text)
+        for m in re.finditer(r'^(\s*(?:[☐☑]\s*)?//)(.*)$', text, re.MULTILINE):
+            start_iter = self.buffer.get_iter_at_offset(m.start())
+            end_iter = self.buffer.get_iter_at_offset(m.end())
+            self.buffer.apply_tag(self.tag_comment, start_iter, end_iter)
             
         return False

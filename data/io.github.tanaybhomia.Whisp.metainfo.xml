@@ -24,5 +24,22 @@
       <li>Instant saving and Native UI styling</li>
     </ul>
   </description>
+
+  <screenshots>
+    <screenshot type="default">
+      <image>https://raw.githubusercontent.com/tanaybhomia/Whisp/main/docs/assets/hero.png</image>
+    </screenshot>
+  </screenshots>
+
+  <content_rating type="oars-1.1" />
+
+  <releases>
+    <release version="1.0.0" date="2026-05-30">
+      <description>
+        <p>Initial release of Whisp. A minimalist, gesture-driven scratchpad for GNOME.</p>
+      </description>
+    </release>
+  </releases>
+
   <launchable type="desktop-id">io.github.tanaybhomia.Whisp.desktop</launchable>
 </component>

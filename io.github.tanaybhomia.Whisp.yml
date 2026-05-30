@@ -1,6 +1,6 @@
 app-id: io.github.tanaybhomia.Whisp
 runtime: org.gnome.Platform
-runtime-version: '49'
+runtime-version: '50'
 sdk: org.gnome.Sdk
 command: whisp
 finish-args:
@@ -8,7 +8,6 @@ finish-args:
   - --socket=fallback-x11
   - --socket=wayland
   - --device=dri
-  - --filesystem=home
 
 modules:
   - name: whisp
@@ -16,4 +15,5 @@ modules:
     sources:
       - type: git
         url: https://github.com/tanaybhomia/Whisp.git
-        tag: v1.0.0
+        tag: v1.0.1
+        commit: 05be584816491813e33f7fcd909ac57b7d9a1af8

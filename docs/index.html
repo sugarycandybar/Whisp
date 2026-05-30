@@ -13,9 +13,9 @@
     <nav class="navbar">
         <div class="nav-content">
             <div class="brand">
-                <img src="assets/icon.svg" alt="Whisp Icon" class="brand-icon">
                 <span class="brand-name">Whisp</span>
             </div>
+            
             <div class="nav-links" style="display: flex; gap: 1.5rem; align-items: center;">
                 <a href="manual.html" style="color: var(--text-primary); text-decoration: none; font-weight: 600;">User Manual</a>
                 <a href="https://github.com/tanaybhomia" target="_blank" style="color: var(--text-secondary); text-decoration: none; font-weight: 600;">@tanaybhomia</a>
@@ -26,6 +26,9 @@
 
     <main>
         <section class="hero-centered">
+            <div class="hero-icon-wrapper">
+                <img src="assets/icon.svg" alt="Whisp App Icon" class="hero-app-icon">
+            </div>
             <h1>The Anti-Note for GNOME.</h1>
             <p class="subtitle">A fluid, gesture-driven scratchpad designed for absolute speed.</p>
             
@@ -267,6 +270,36 @@
 
             heroWrapper.addEventListener('mouseenter', () => {
                 heroImg.style.transition = 'transform 0.1s ease-out';
+            });
+        }
+
+        // Hero icon 3D Parallax Tilt Effect
+        const heroIconWrapper = document.querySelector('.hero-icon-wrapper');
+        const heroIconImg = document.querySelector('.hero-app-icon');
+
+        if (heroIconWrapper && heroIconImg) {
+            heroIconWrapper.addEventListener('mousemove', (e) => {
+                const rect = heroIconWrapper.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                
+                const centerX = rect.width / 2;
+                const centerY = rect.height / 2;
+                
+                // Max 15 deg tilt
+                const rotateX = ((y - centerY) / centerY) * -15; 
+                const rotateY = ((x - centerX) / centerX) * 15;
+                
+                heroIconImg.style.transform = `scale(1.1) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
+            });
+
+            heroIconWrapper.addEventListener('mouseleave', () => {
+                heroIconImg.style.transform = 'scale(1) rotateX(0) rotateY(0)';
+                heroIconImg.style.transition = 'transform 0.5s ease-out';
+            });
+
+            heroIconWrapper.addEventListener('mouseenter', () => {
+                heroIconImg.style.transition = 'transform 0.1s ease-out';
             });
         }
     </script>

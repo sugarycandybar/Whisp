@@ -1,11 +1,14 @@
 <div align="center">
-  <!-- ICON PLACEHOLDER: Insert your exported SVG/PNG here -->
-  <img src="docs/assets/icon-placeholder.svg" alt="Whisp Icon" width="128" height="128">
+  <img src="data/icons/io.github.tanaybhomia.Whisp.svg" alt="Whisp Icon" width="128" height="128">
 
   <h1>Whisp</h1>
   <p><b>The Anti-Note for GNOME. A fluid, gesture-driven scratchpad designed for speed.</b></p>
 
-  <!-- BADGES PLACEHOLDER -->
+  <a href="https://flathub.org/apps/io.github.tanaybhomia.Whisp">
+    <img src="https://flathub.org/assets/badges/flathub-badge-en.png" alt="Download on Flathub" height="50">
+  </a>
+  <br><br>
+  
   <a href="#"><img src="https://img.shields.io/badge/Platform-GNOME-4A86CF?style=flat-square" alt="Platform: GNOME"></a>
   <a href="#"><img src="https://img.shields.io/badge/GTK-4.0-white?style=flat-square&logo=gtk" alt="GTK4"></a>
   <a href="#"><img src="https://img.shields.io/badge/License-GPLv3-blue?style=flat-square" alt="License: GPLv3"></a>

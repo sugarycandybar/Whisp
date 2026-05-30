@@ -4,7 +4,7 @@ from whisp.window import WhispWindow
 
 class WhispApp(Adw.Application):
     def __init__(self):
-        super().__init__(application_id="com.example.Whisp", flags=Gio.ApplicationFlags.HANDLES_OPEN)
+        super().__init__(application_id="io.github.tanaybhomia.Whisp", flags=Gio.ApplicationFlags.HANDLES_OPEN)
 
     def do_startup(self):
         Adw.Application.do_startup(self)

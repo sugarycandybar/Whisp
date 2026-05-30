@@ -7,8 +7,8 @@
     --card-border: rgba(0, 0, 0, 0.1);
     --text-primary: #1e1e1e;
     --text-secondary: rgba(0, 0, 0, 0.6);
-    --accent-color: #c061cb;
-    --accent-hover: #d27dec;
+    --accent-color: #0ab3bb;
+    --accent-hover: #00cccc;
     --font-mono: 'JetBrains Mono', monospace;
 }
 
@@ -53,11 +53,10 @@ h1, h2, h3 {
     gap: 12px;
 }
 
-.icon-placeholder-small {
+.brand-icon {
     width: 32px;
     height: 32px;
-    background-color: var(--accent-color);
-    border-radius: 8px;
+    object-fit: contain;
 }
 
 .brand-name {

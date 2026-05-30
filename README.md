@@ -1,7 +1,5 @@
 <div align="center">
-  <img src="data/icons/io.github.tanaybhomia.Whisp.svg" alt="Whisp Icon" width="128" height="128">
-
-  <h1>Whisp</h1>
+  <h1><img src="data/icons/io.github.tanaybhomia.Whisp.svg" alt="Whisp Icon" width="48" height="48" style="vertical-align: middle;"> Whisp</h1>
   <p><b>The Anti-Note for GNOME. A fluid, gesture-driven scratchpad designed for speed.</b></p>
 
   <a href="https://flathub.org/apps/io.github.tanaybhomia.Whisp">

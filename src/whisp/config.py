@@ -1,14 +1,15 @@
 import json
 from pathlib import Path
+from gi.repository import GLib
 
 # Data directory configuration
-CONFIG_DIR = Path.home() / ".config" / "whisp"
+CONFIG_DIR = Path(GLib.get_user_config_dir()) / "whisp"
 CONFIG_FILE = CONFIG_DIR / "config.json"
 
 class Config:
     def __init__(self):
         self.data = {
-            "data_dir": str(Path.home() / ".local" / "share" / "whisp" / "notes"),
+            "data_dir": str(Path(GLib.get_user_data_dir()) / "whisp" / "notes"),
             "window_width": 400,
             "window_height": 400,
             "is_maximized": False,

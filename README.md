@@ -34,18 +34,13 @@ Whisp is a minimalist, lightning-fast note-taking application built strictly for
 
 ## Installation
 
-Whisp uses the standard Meson build system. It is currently being packaged for Flathub.
-
-### Building from Source
-
-Dependencies required: `python3`, `meson`, `ninja`, `python3-gi`, `libadwaita`, and `gtk4`.
+Whisp is officially distributed through Flathub, making it easy to install on any Linux distribution.
 
 ```bash
-git clone <your-repo-url>
-cd Whisp
-meson setup builddir
-sudo meson install -C builddir
+flatpak install flathub io.github.tanaybhomia.Whisp
 ```
+
+*(If you prefer to build from source using Meson, please see our repository documentation).*
 
 ## Architecture
 

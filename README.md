@@ -32,6 +32,34 @@ Whisp is a minimalist, lightning-fast note-taking application built strictly for
 - **Performance Focused**: Maintains a lightweight footprint by rendering only the most recently active notes, ensuring instant startup times.
 - **Robust Management**: Search, filter by tags, and safely manage deleted files within a hidden `.trash` directory.
 
+## 🗺️ Roadmap
+
+Here are the features we are planning to add, ordered by priority:
+
+- [ ] **Math Engine**
+- [ ] **Reactive variables**
+- [ ] **Auto Paste** with paste module
+- [ ] **Image to text**
+- [ ] **Themes**
+  - [ ] Adding normal themes like gruvbox to variables
+  - [ ] Large Grid
+  - [ ] Lines
+- [ ] **Search**
+- [ ] **Find and Replace**
+- [ ] **Generate Random numbers**
+- [ ] **Roll Dice**
+- [ ] **Generate Random Strings**
+- [ ] **Modules** (like `today` etc)
+- [ ] **Reminders** (e.g. `// Reminder: "complete x on 2 aug 3am"`)
+- [ ] **Pinning notes** (stays at the start, moves to the top like a stack, cannot be deleted until unpinned)
+
+### Maybe
+- [ ] Conversions
+- [ ] Export
+
+### Very maybe
+- [ ] Templates
+
 
 ## Installation
 

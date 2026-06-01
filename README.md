@@ -32,14 +32,6 @@ Whisp is a minimalist, lightning-fast note-taking application built strictly for
 - **Performance Focused**: Maintains a lightweight footprint by rendering only the most recently active notes, ensuring instant startup times.
 - **Robust Management**: Search, filter by tags, and safely manage deleted files within a hidden `.trash` directory.
 
-## 🗺️ Roadmap
-
-We are constantly iterating on Whisp to make it the most powerful spatial scratchpad for GNOME. Here is what we are actively working on:
-
-- [ ] **Inline Math Engine** *(In Progress)*: Type equations directly into your notes (e.g. `15 * 4 =`) and Whisp will instantly calculate and inject the answer.
-- [ ] **Cloud Sync**: Seamless, encrypted background synchronization using your personal Nextcloud or WebDAV server.
-- [ ] **Drawing / Canvas Support**: The ability to quickly sketch or handwrite notes using a stylus directly on the dotted/grid paper themes.
-- [ ] **Pin to Desktop**: Tear off a specific note from the carousel and pin it persistently to your desktop background.
 
 ## Installation
 

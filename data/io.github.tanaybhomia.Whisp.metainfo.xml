@@ -2,7 +2,7 @@
 <component type="desktop-application">
   <id>io.github.tanaybhomia.Whisp</id>
   <name>Whisp</name>
-  <summary>A minimalist note taking widget</summary>
+  <summary>Minimalist note taking widget</summary>
   <developer_name>Tanay Bhomia</developer_name>
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>GPL-3.0-or-later</project_license>
@@ -13,6 +13,10 @@
     <color type="primary" scheme_preference="light">#00cccc</color>
     <color type="primary" scheme_preference="dark">#004252</color>
   </branding>
+
+  <custom>
+    <value key="flathub::brand::primary">#00cccc</value>
+  </custom>
 
   <description>
     <p>Whisp is a beautifully simple, gesture-driven note-taking application designed for GNOME.</p>
@@ -43,6 +47,11 @@
   <content_rating type="oars-1.1" />
 
   <releases>
+    <release version="1.0.4" date="2026-06-01">
+      <description>
+        <p>Metadata updates to satisfy Flathub quality guidelines and roadmap additions.</p>
+      </description>
+    </release>
     <release version="1.0.0" date="2026-05-30">
       <description>
         <p>Initial release of Whisp. A minimalist, gesture-driven scratchpad for GNOME.</p>

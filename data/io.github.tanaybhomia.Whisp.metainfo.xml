@@ -9,10 +9,10 @@
   <url type="homepage">https://github.com/tanaybhomia/Whisp</url>
   <url type="bugtracker">https://github.com/tanaybhomia/Whisp/issues</url>
   
-  <custom>
-    <value key="flathub::theme::primary">#00cccc</value>
-    <value key="flathub::theme::secondary">#004252</value>
-  </custom>
+  <branding>
+    <color type="primary" scheme_preference="light">#00cccc</color>
+    <color type="primary" scheme_preference="dark">#004252</color>
+  </branding>
 
   <description>
     <p>Whisp is a beautifully simple, gesture-driven note-taking application designed for GNOME.</p>
@@ -28,6 +28,15 @@
   <screenshots>
     <screenshot type="default">
       <image>https://raw.githubusercontent.com/tanaybhomia/Whisp/main/docs/assets/hero.png</image>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/tanaybhomia/Whisp/main/docs/assets/theme-grid.png</image>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/tanaybhomia/Whisp/main/docs/assets/wysiwyg-on.png</image>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/tanaybhomia/Whisp/main/docs/assets/carousel-4.png</image>
     </screenshot>
   </screenshots>
 

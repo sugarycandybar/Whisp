@@ -32,7 +32,7 @@ Whisp is a minimalist, lightning-fast note-taking application built strictly for
 - **Performance Focused**: Maintains a lightweight footprint by rendering only the most recently active notes, ensuring instant startup times.
 - **Robust Management**: Search, filter by tags, and safely manage deleted files within a hidden `.trash` directory.
 
-## 🗺️ Roadmap
+## Roadmap
 
 Here are the features we are planning to add, ordered by priority:
 

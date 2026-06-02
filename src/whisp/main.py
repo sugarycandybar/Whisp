@@ -1,4 +1,7 @@
 import sys
+import gi
+gi.require_version('Gtk', '4.0')
+gi.require_version('Adw', '1')
 from gi.repository import Gtk, Adw, Gdk, Gio
 from whisp.window import WhispWindow
 
@@ -22,6 +25,7 @@ class WhispApp(Adw.Application):
         css_provider.load_from_data(b"""
             window.background { background-color: @view_bg_color; }
             textview { background-color: transparent; }
+            window.about image.icon { transform: scale(0.8); }
         """)
         Gtk.StyleContext.add_provider_for_display(
             Gdk.Display.get_default(),
@@ -64,3 +68,6 @@ class WhispApp(Adw.Application):
 def main():
     app = WhispApp()
     return app.run(sys.argv)
+
+if __name__ == '__main__':
+    sys.exit(main())

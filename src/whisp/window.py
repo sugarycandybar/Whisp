@@ -191,6 +191,10 @@ class WhispWindow(Adw.ApplicationWindow):
         wysiwyg_action.connect("activate", self.on_wysiwyg_shortcut)
         self.add_action(wysiwyg_action)
 
+        about_action = Gio.SimpleAction.new("about", None)
+        about_action.connect("activate", self.on_about)
+        self.add_action(about_action)
+
         # HeaderBar
         self.header_bar = Adw.HeaderBar()
         self.header_bar.add_css_class("flat")
@@ -248,6 +252,7 @@ class WhispWindow(Adw.ApplicationWindow):
         menu_model = Gio.Menu()
         menu_model.append("Keyboard Shortcuts", "win.show-shortcuts")
         menu_model.append("Preferences", "win.preferences")
+        menu_model.append("About Whisp", "win.about")
         self.menu_button.set_menu_model(menu_model)
         self.header_bar.pack_end(self.menu_button)
 
@@ -257,6 +262,21 @@ class WhispWindow(Adw.ApplicationWindow):
         self.carousel.set_interactive(True)
         self.carousel.connect("page-changed", self.on_page_changed)
         self.box.append(self.carousel)
+
+    def on_about(self, action, param):
+        about = Adw.AboutWindow(
+            application_name="Whisp",
+            application_icon="io.github.tanaybhomia.Whisp",
+            developer_name="Tanay Bhomia",
+            developers=["Tanay Bhomia"],
+            version="1.0.4",
+            website="https://github.com/tanaybhomia/Whisp",
+            issue_url="https://github.com/tanaybhomia/Whisp/issues",
+            license_type=Gtk.License.GPL_3_0
+        )
+        about.set_default_size(360, -1)
+        about.set_transient_for(self)
+        about.present()
 
     def on_nav_next(self, action=None, param=None):
         n_pages = self.carousel.get_n_pages()

@@ -71,6 +71,23 @@ flatpak install flathub io.github.tanaybhomia.Whisp
 
 *(If you prefer to build from source using Meson, please see our repository documentation).*
 
+## Contribution & Development
+
+If you'd like to contribute to Whisp or build your own version, we have set up scripts to make local development frictionless.
+
+### Local Testing
+You do not need to install the app or compile it with Meson just to test Python code changes. Run the following command in the project root to instantly launch the app from the source code:
+```bash
+./run.sh
+```
+
+### Development Environment Setup
+If you want to use the official Flathub release for your daily notes, but also want a separate development version of Whisp in your app launcher for testing, run:
+```bash
+./install-dev.sh
+```
+This script creates a separate "Whisp (Development)" entry in your GNOME app grid. It uses a custom development icon and saves your test notes to a completely isolated folder (`~/.local/share/Whisp/`), keeping your official Flatpak notes safe. Any code changes you make in your IDE will instantly be reflected the next time you click the Development app icon.
+
 ## Architecture
 
 Whisp adheres strictly to the GNOME Human Interface Guidelines (HIG). It leverages `Adw.Carousel` for its swipeable interface and uses a highly optimized `Gtk.TextView` wrapper to instantly parse and decorate Markdown text dynamically.

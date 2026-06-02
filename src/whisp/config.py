@@ -14,7 +14,8 @@ class Config:
             "window_height": 400,
             "is_maximized": False,
             "font_name": "Monospace 11",
-            "paper_theme": "blank"
+            "paper_theme": "blank",
+            "confirm_delete": True
         }
         self.load()
 

@@ -396,24 +396,48 @@ class WhispWindow(Adw.ApplicationWindow):
         n_pages = self.carousel.get_n_pages()
         if n_pages == 0:
             return
-            
+
         current_page_idx = int(round(self.carousel.get_position()))
         editor = self.carousel.get_nth_page(current_page_idx)
-        
+
+        # Skip confirmation for empty/unsaved notes (nothing to lose), or when disabled
+        if not editor.file_path.exists() or editor.is_empty() or not config.get("confirm_delete", True):
+            self.perform_delete(editor)
+            return
+
+        title = editor.get_title()
+        dialog = Adw.MessageDialog(
+            transient_for=self,
+            heading="Delete Note?",
+            body=f"“{title}” will be moved to the trash. You can undo this with Ctrl+Shift+T.",
+        )
+        dialog.add_response("cancel", "Cancel")
+        dialog.add_response("delete", "Delete")
+        dialog.set_response_appearance("delete", Adw.ResponseAppearance.DESTRUCTIVE)
+        dialog.set_default_response("cancel")
+        dialog.set_close_response("cancel")
+        dialog.connect("response", self.on_delete_dialog_response, editor)
+        dialog.present()
+
+    def on_delete_dialog_response(self, dialog, response, editor):
+        if response == "delete":
+            self.perform_delete(editor)
+
+    def perform_delete(self, editor):
         if editor.file_path.exists():
             TRASH_DIR.mkdir(parents=True, exist_ok=True)
             shutil.move(str(editor.file_path), str(TRASH_DIR / editor.file_path.name))
             self.last_deleted_file = editor.file_path.name
-            
+
             if hasattr(self, 'current_toast') and self.current_toast:
                 self.current_toast.dismiss()
-                
+
             self.current_toast = Adw.Toast.new("Note deleted")
             self.current_toast.set_timeout(3)
             self.toast_overlay.add_toast(self.current_toast)
-            
+
         self.carousel.remove(editor)
-        
+
         if self.carousel.get_n_pages() == 0:
             self.add_note()
         else:
@@ -562,6 +586,23 @@ class WhispWindow(Adw.ApplicationWindow):
         
         page.add(font_group)
 
+        # Behavior Group
+        behavior_group = Adw.PreferencesGroup(title="Behavior")
+
+        confirm_row = Adw.ActionRow(
+            title="Confirm Before Deleting",
+            subtitle="Ask for confirmation when deleting a note",
+        )
+        confirm_switch = Gtk.Switch()
+        confirm_switch.set_valign(Gtk.Align.CENTER)
+        confirm_switch.set_active(config.get("confirm_delete", True))
+        confirm_switch.connect("notify::active", self.on_confirm_delete_changed)
+        confirm_row.add_suffix(confirm_switch)
+        confirm_row.set_activatable_widget(confirm_switch)
+        behavior_group.add(confirm_row)
+
+        page.add(behavior_group)
+
         # Storage Group
         group = Adw.PreferencesGroup(title="Storage")
         
@@ -598,6 +639,9 @@ class WhispWindow(Adw.ApplicationWindow):
             spacing = selected.get_string()
             config.set("line_spacing", spacing)
             self.update_line_spacing()
+
+    def on_confirm_delete_changed(self, switch, param):
+        config.set("confirm_delete", switch.get_active())
 
     def update_line_spacing(self):
         spacing_str = config.get("line_spacing", "1.2")

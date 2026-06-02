@@ -137,7 +137,9 @@ class WhispWindow(Adw.ApplicationWindow):
         if config.get("is_maximized"):
             self.maximize()
             
-        self.set_title("Whisp")
+        from whisp.main import IS_DEV_MODE
+        title = "Whisp (Development)" if IS_DEV_MODE else "Whisp"
+        self.set_title(title)
         self.connect("close-request", self.on_close_request)
         
         # Font and Theme styling

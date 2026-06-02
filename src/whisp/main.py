@@ -5,12 +5,24 @@ gi.require_version('Adw', '1')
 from gi.repository import Gtk, Adw, Gdk, Gio
 from whisp.window import WhispWindow
 
+IS_DEV_MODE = "--dev" in sys.argv
+
 class WhispApp(Adw.Application):
     def __init__(self):
-        super().__init__(application_id="io.github.tanaybhomia.Whisp", flags=Gio.ApplicationFlags.HANDLES_OPEN)
+        app_id = "io.github.tanaybhomia.Whisp.Devel" if IS_DEV_MODE else "io.github.tanaybhomia.Whisp"
+        super().__init__(application_id=app_id, flags=Gio.ApplicationFlags.HANDLES_OPEN)
 
     def do_startup(self):
         Adw.Application.do_startup(self)
+        
+        # Add local icon directory to search path for testing
+        import os
+        from pathlib import Path
+        icon_theme = Gtk.IconTheme.get_for_display(Gdk.Display.get_default())
+        icon_dir = Path(__file__).parent.parent.parent / "data" / "icons"
+        if icon_dir.exists():
+            icon_theme.add_search_path(str(icon_dir))
+            
         self.set_accels_for_action("win.new-note", ["<Ctrl>n"])
         self.set_accels_for_action("win.delete-note", ["<Ctrl>d", "<Ctrl>Delete"])
         self.set_accels_for_action("win.preferences", ["<Ctrl>comma"])
@@ -66,6 +78,8 @@ class WhispApp(Adw.Application):
         win.present()
 
 def main():
+    if '--dev' in sys.argv:
+        sys.argv.remove('--dev')
     app = WhispApp()
     return app.run(sys.argv)
 

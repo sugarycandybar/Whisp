@@ -47,6 +47,11 @@
   <content_rating type="oars-1.1" />
 
   <releases>
+    <release version="1.0.5" date="2026-06-02">
+      <description>
+        <p>Added a native GNOME About dialog with credits and license details. Restored original icon size based on user feedback.</p>
+      </description>
+    </release>
     <release version="1.0.4" date="2026-06-01">
       <description>
         <p>Metadata updates to satisfy Flathub quality guidelines and roadmap additions.</p>

@@ -355,9 +355,12 @@ class WhispWindow(Adw.ApplicationWindow):
             GLib.timeout_add(200, restore_session)
             GLib.timeout_add(500, restore_session)
 
-    def add_note(self, file_path=None, grab_focus=True):
+    def add_note(self, file_path=None, grab_focus=True, index=None):
         editor = NoteEditor(file_path=file_path, on_title_changed=self.on_editor_title_changed)
-        self.carousel.append(editor)
+        if index is not None:
+            self.carousel.insert(editor, index)
+        else:
+            self.carousel.append(editor)
         # Disable animation for instant snappy feeling
         if grab_focus:
             self.carousel.scroll_to(editor, False)
@@ -389,8 +392,10 @@ class WhispWindow(Adw.ApplicationWindow):
         
         if trash_path.exists():
             shutil.move(str(trash_path), str(data_path))
-            self.add_note(data_path, grab_focus=True)
+            idx = getattr(self, 'last_deleted_index', None)
+            self.add_note(data_path, grab_focus=True, index=idx)
             self.last_deleted_file = None
+            self.last_deleted_index = None
 
     def on_delete_note(self, action=None, param=None):
         n_pages = self.carousel.get_n_pages()
@@ -428,6 +433,14 @@ class WhispWindow(Adw.ApplicationWindow):
             self.perform_delete(editor)
 
     def perform_delete(self, editor):
+        # Find index to allow restoring to the exact same position
+        idx = -1
+        for i in range(self.carousel.get_n_pages()):
+            if self.carousel.get_nth_page(i) == editor:
+                idx = i
+                break
+        self.last_deleted_index = idx if idx != -1 else None
+
         if editor.file_path.exists():
             TRASH_DIR.mkdir(parents=True, exist_ok=True)
             shutil.move(str(editor.file_path), str(TRASH_DIR / editor.file_path.name))

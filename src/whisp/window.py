@@ -400,8 +400,12 @@ class WhispWindow(Adw.ApplicationWindow):
         current_page_idx = int(round(self.carousel.get_position()))
         editor = self.carousel.get_nth_page(current_page_idx)
 
-        # Skip confirmation for empty/unsaved notes (nothing to lose), or when disabled
-        if not editor.file_path.exists() or editor.is_empty() or not config.get("confirm_delete", True):
+        # Don't allow deleting an already empty note (prevents app locking bug)
+        if editor.is_empty():
+            return
+
+        # Skip confirmation for unsaved notes (nothing to lose), or when disabled
+        if not editor.file_path.exists() or not config.get("confirm_delete", True):
             self.perform_delete(editor)
             return
 

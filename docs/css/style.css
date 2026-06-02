@@ -590,6 +590,7 @@ kbd {
 }
 
 @media (max-width: 768px) {
+    /* Manual Page Styles */
     .manual-layout {
         flex-direction: column;
     }
@@ -604,5 +605,58 @@ kbd {
     
     .manual-content {
         padding: 2rem;
+    }
+
+    /* Main Page Mobile Styles */
+    .nav-content {
+        flex-direction: column;
+        gap: 1rem;
+        text-align: center;
+    }
+    
+    .nav-links {
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+    
+    .hero-centered {
+        margin: 3rem auto 2rem;
+        padding: 0 1rem;
+    }
+    
+    .hero-centered h1 {
+        font-size: 2.5rem;
+    }
+    
+    .subtitle {
+        font-size: 1rem;
+        margin-bottom: 2rem;
+    }
+    
+    .bento-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .bento-card.large, .bento-card.wide {
+        grid-column: span 1;
+        grid-row: span 1;
+    }
+    
+    .bento-section {
+        margin: 4rem auto;
+        padding: 0 1rem;
+    }
+    
+    .carousel-section {
+        margin: 4rem auto;
+        padding: 0 1rem;
+    }
+    
+    .carousel-container {
+        height: 400px;
+    }
+    
+    .slide-placeholder {
+        height: 250px;
     }
 }

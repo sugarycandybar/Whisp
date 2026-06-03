@@ -15,7 +15,9 @@ class Config:
             "is_maximized": False,
             "font_name": "Monospace 11",
             "paper_theme": "blank",
-            "confirm_delete": True
+            "confirm_delete": True,
+            "color_scheme": "system",
+            "startup_behavior": "last_note"
         }
         self.load()
 

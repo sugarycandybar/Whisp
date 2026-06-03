@@ -47,6 +47,16 @@
   <content_rating type="oars-1.1" />
 
   <releases>
+    <release version="1.1.0" date="2026-06-03">
+      <description>
+        <p>Added new Quality of Life features and fixed critical bugs:</p>
+        <ul>
+          <li>Added a visual Theme Switcher in the main menu to easily toggle between System, Light, and Dark modes.</li>
+          <li>Added a Startup Behavior preference to choose whether the app restores your last active note or starts with a fresh empty draft.</li>
+          <li>Fixed a race condition where quickly deleting a note using a keyboard shortcut would occasionally cause the note to save itself in the background as a "ghost note".</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.0.8" date="2026-06-03">
       <description>
         <p>Fixed a severe Flatpak Document Portal permission error that caused permanent deletion when using custom Note directories.</p>

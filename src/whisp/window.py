@@ -251,12 +251,63 @@ class WhispWindow(Adw.ApplicationWindow):
         # Hamburger menu
         self.menu_button = Gtk.MenuButton()
         self.menu_button.set_icon_name("open-menu-symbolic")
-        menu_model = Gio.Menu()
-        menu_model.append("Keyboard Shortcuts", "win.show-shortcuts")
-        menu_model.append("Preferences", "win.preferences")
-        menu_model.append("About Whisp", "win.about")
-        self.menu_button.set_menu_model(menu_model)
+        
+        theme_item = Gio.MenuItem.new(None, None)
+        theme_item.set_attribute_value("custom", GLib.Variant.new_string("theme-switcher"))
+        
+        main_menu = Gio.Menu()
+        main_menu.append_item(theme_item)
+        
+        section = Gio.Menu()
+        section.append("Keyboard Shortcuts", "win.show-shortcuts")
+        section.append("Preferences", "win.preferences")
+        section.append("About Whisp", "win.about")
+        main_menu.append_section(None, section)
+        
+        popover = Gtk.PopoverMenu.new_from_model(main_menu)
+        
+        theme_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=16)
+        theme_box.set_halign(Gtk.Align.CENTER)
+        theme_box.set_margin_top(8)
+        theme_box.set_margin_bottom(8)
+        theme_box.set_margin_start(12)
+        theme_box.set_margin_end(12)
+        
+        self.btn_system = Gtk.ToggleButton()
+        self.btn_system.add_css_class("theme-btn")
+        self.btn_system.add_css_class("system")
+        self.btn_system.connect("toggled", self.on_theme_btn_toggled, "system")
+        
+        self.btn_light = Gtk.ToggleButton()
+        self.btn_light.add_css_class("theme-btn")
+        self.btn_light.add_css_class("light")
+        self.btn_light.set_group(self.btn_system)
+        self.btn_light.connect("toggled", self.on_theme_btn_toggled, "light")
+        
+        self.btn_dark = Gtk.ToggleButton()
+        self.btn_dark.add_css_class("theme-btn")
+        self.btn_dark.add_css_class("dark")
+        self.btn_dark.set_group(self.btn_system)
+        self.btn_dark.connect("toggled", self.on_theme_btn_toggled, "dark")
+        
+        theme_box.append(self.btn_system)
+        theme_box.append(self.btn_light)
+        theme_box.append(self.btn_dark)
+        
+        popover.add_child(theme_box, "theme-switcher")
+        self.menu_button.set_popover(popover)
         self.header_bar.pack_end(self.menu_button)
+
+        # Apply initial theme state
+        current_theme = config.get("color_scheme", "system")
+        if current_theme == "light":
+            self.btn_light.set_active(True)
+        elif current_theme == "dark":
+            self.btn_dark.set_active(True)
+        else:
+            self.btn_system.set_active(True)
+            
+        self._apply_color_scheme(current_theme)
 
         # Carousel
         self.carousel = Adw.Carousel()
@@ -264,6 +315,20 @@ class WhispWindow(Adw.ApplicationWindow):
         self.carousel.set_interactive(True)
         self.carousel.connect("page-changed", self.on_page_changed)
         self.box.append(self.carousel)
+
+    def on_theme_btn_toggled(self, btn, scheme):
+        if btn.get_active():
+            config.set("color_scheme", scheme)
+            self._apply_color_scheme(scheme)
+
+    def _apply_color_scheme(self, scheme):
+        manager = Adw.StyleManager.get_default()
+        if scheme == "light":
+            manager.set_color_scheme(Adw.ColorScheme.FORCE_LIGHT)
+        elif scheme == "dark":
+            manager.set_color_scheme(Adw.ColorScheme.FORCE_DARK)
+        else:
+            manager.set_color_scheme(Adw.ColorScheme.DEFAULT)
 
     def _get_dynamic_version(self):
         import xml.etree.ElementTree as ET
@@ -355,12 +420,16 @@ class WhispWindow(Adw.ApplicationWindow):
         if n_pages > 0:
             target_idx = n_pages - 2 if n_pages > 1 else 0
             
-            last_active = config.get("last_active_note")
-            if last_active:
-                for i in range(n_pages):
-                    if str(self.carousel.get_nth_page(i).file_path) == last_active:
-                        target_idx = i
-                        break
+            startup_behavior = config.get("startup_behavior", "last_note")
+            if startup_behavior == "empty_note":
+                target_idx = n_pages - 1
+            else:
+                last_active = config.get("last_active_note")
+                if last_active:
+                    for i in range(n_pages):
+                        if str(self.carousel.get_nth_page(i).file_path) == last_active:
+                            target_idx = i
+                            break
                         
             target_editor = self.carousel.get_nth_page(target_idx)
             
@@ -431,8 +500,8 @@ class WhispWindow(Adw.ApplicationWindow):
         if editor.is_empty():
             return
 
-        # Skip confirmation for unsaved notes (nothing to lose), or when disabled
-        if not editor.file_path.exists() or not config.get("confirm_delete", True):
+        # Skip confirmation if user disabled it
+        if not config.get("confirm_delete", True):
             self.perform_delete(editor)
             return
 
@@ -455,6 +524,11 @@ class WhispWindow(Adw.ApplicationWindow):
             self.perform_delete(editor)
 
     def perform_delete(self, editor):
+        # Cancel any pending save timeout to prevent a "ghost note" from writing itself to disk after deletion
+        if hasattr(editor, 'save_timeout_id') and editor.save_timeout_id:
+            GLib.source_remove(editor.save_timeout_id)
+            editor.save_timeout_id = 0
+
         # Find index to allow restoring to the exact same position
         idx = -1
         for i in range(self.carousel.get_n_pages()):
@@ -463,35 +537,37 @@ class WhispWindow(Adw.ApplicationWindow):
                 break
         self.last_deleted_index = idx if idx != -1 else None
 
+        toast_msg = "Note deleted"
         if editor.file_path.exists():
             try:
                 TRASH_DIR.mkdir(parents=True, exist_ok=True)
                 dest_path = TRASH_DIR / editor.file_path.name
                 
-                # shutil.move crashes if the destination file already exists (e.g. deleting two "Untitled Note.txt"s).
-                # We must delete the old trashed note first if it shares the same name.
+                # shutil.move crashes if the destination file already exists
                 if dest_path.exists():
                     dest_path.unlink()
                     
                 # Try to move to trash first
                 shutil.move(str(editor.file_path), str(dest_path))
                 self.last_deleted_file = editor.file_path.name
-                toast_msg = "Note deleted"
             except Exception as e:
-                # Fallback: if trash move fails (e.g. Flatpak filesystem quirk), just delete it permanently
+                # Fallback
                 try:
                     editor.file_path.unlink(missing_ok=True)
                     self.last_deleted_file = None
                     toast_msg = f"Permanent delete fallback (Error: {str(e)})"
                 except Exception as e2:
                     toast_msg = f"Failed to delete completely: {e2}"
+        else:
+            # Note was never saved to disk
+            self.last_deleted_file = None
 
-            if hasattr(self, 'current_toast') and self.current_toast:
-                self.current_toast.dismiss()
+        if hasattr(self, 'current_toast') and self.current_toast:
+            self.current_toast.dismiss()
 
-            self.current_toast = Adw.Toast.new(toast_msg)
-            self.current_toast.set_timeout(3)
-            self.toast_overlay.add_toast(self.current_toast)
+        self.current_toast = Adw.Toast.new(toast_msg)
+        self.current_toast.set_timeout(3)
+        self.toast_overlay.add_toast(self.current_toast)
 
         self.carousel.remove(editor)
 
@@ -645,6 +721,19 @@ class WhispWindow(Adw.ApplicationWindow):
 
         # Behavior Group
         behavior_group = Adw.PreferencesGroup(title="Behavior")
+        
+        startup_row = Adw.ActionRow(title="Startup Behavior")
+        startup_model = Gtk.StringList.new(["Restore last active note", "Start with empty note"])
+        startup_dropdown = Gtk.DropDown(model=startup_model)
+        startup_dropdown.set_valign(Gtk.Align.CENTER)
+        
+        current_startup = config.get("startup_behavior", "last_note")
+        idx = 1 if current_startup == "empty_note" else 0
+        startup_dropdown.set_selected(idx)
+        
+        startup_dropdown.connect("notify::selected-item", self.on_startup_behavior_changed)
+        startup_row.add_suffix(startup_dropdown)
+        behavior_group.add(startup_row)
 
         confirm_row = Adw.ActionRow(
             title="Confirm Before Deleting",
@@ -699,6 +788,11 @@ class WhispWindow(Adw.ApplicationWindow):
 
     def on_confirm_delete_changed(self, switch, param):
         config.set("confirm_delete", switch.get_active())
+
+    def on_startup_behavior_changed(self, dropdown, param):
+        selected = dropdown.get_selected()
+        val = "empty_note" if selected == 1 else "last_note"
+        config.set("startup_behavior", val)
 
     def update_line_spacing(self):
         spacing_str = config.get("line_spacing", "1.2")
@@ -790,8 +884,32 @@ class WhispWindow(Adw.ApplicationWindow):
         else:
             bg_css = "background-image: none;"
             
-        css = f"textview {{ {font_css} {bg_css} }}"
+        custom_css = f"""
+        textview {{ {font_css} {bg_css} }}
+        
+        .theme-btn {{
+            min-width: 48px;
+            min-height: 48px;
+            border-radius: 50%;
+            border: 1px solid alpha(currentColor, 0.15);
+            padding: 0;
+            box-shadow: none;
+        }}
+        .theme-btn.system {{
+            background: linear-gradient(135deg, #ffffff 49.5%, #242424 50.5%);
+        }}
+        .theme-btn.light {{
+            background: #ffffff;
+        }}
+        .theme-btn.dark {{
+            background: #242424;
+        }}
+        .theme-btn:checked {{
+            border: 2px solid @accent_bg_color;
+            box-shadow: inset 0 0 0 2px @window_bg_color;
+        }}
+        """
         try:
-            self.css_provider.load_from_data(css.encode('utf-8'))
+            self.css_provider.load_from_data(custom_css.encode('utf-8'))
         except GLib.Error:
             pass

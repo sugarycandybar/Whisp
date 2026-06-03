@@ -69,8 +69,6 @@ Whisp is officially distributed through Flathub, making it easy to install on an
 flatpak install flathub io.github.tanaybhomia.Whisp
 ```
 
-*(If you prefer to build from source using Meson, please see our repository documentation).*
-
 ## Contribution & Development
 
 If you'd like to contribute to Whisp or build your own version, we have set up scripts to make local development frictionless.

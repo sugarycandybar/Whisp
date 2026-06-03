@@ -265,13 +265,35 @@ class WhispWindow(Adw.ApplicationWindow):
         self.carousel.connect("page-changed", self.on_page_changed)
         self.box.append(self.carousel)
 
+    def _get_dynamic_version(self):
+        import xml.etree.ElementTree as ET
+        from pathlib import Path
+        try:
+            # Try Flatpak path first
+            meta_path = Path("/app/share/metainfo/io.github.tanaybhomia.Whisp.metainfo.xml")
+            if not meta_path.exists():
+                # Fallback to local source tree
+                meta_path = Path(__file__).parent.parent.parent / "data" / "io.github.tanaybhomia.Whisp.metainfo.xml"
+                
+            tree = ET.parse(meta_path)
+            root = tree.getroot()
+            releases = root.find("releases")
+            if releases is not None:
+                latest_release = releases.find("release")
+                if latest_release is not None:
+                    return latest_release.attrib.get("version", "Unknown")
+        except Exception:
+            pass
+        return "Unknown"
+
     def on_about(self, action, param):
+        version = self._get_dynamic_version()
         about = Adw.AboutWindow(
             application_name="Whisp",
             application_icon="io.github.tanaybhomia.Whisp",
             developer_name="Tanay Bhomia",
             developers=["Tanay Bhomia"],
-            version="1.0.4",
+            version=version,
             website="https://github.com/tanaybhomia/Whisp",
             issue_url="https://github.com/tanaybhomia/Whisp/issues",
             license_type=Gtk.License.GPL_3_0
@@ -442,14 +464,25 @@ class WhispWindow(Adw.ApplicationWindow):
         self.last_deleted_index = idx if idx != -1 else None
 
         if editor.file_path.exists():
-            TRASH_DIR.mkdir(parents=True, exist_ok=True)
-            shutil.move(str(editor.file_path), str(TRASH_DIR / editor.file_path.name))
-            self.last_deleted_file = editor.file_path.name
+            try:
+                TRASH_DIR.mkdir(parents=True, exist_ok=True)
+                # Try to move to trash first
+                shutil.move(str(editor.file_path), str(TRASH_DIR / editor.file_path.name))
+                self.last_deleted_file = editor.file_path.name
+                toast_msg = "Note deleted"
+            except Exception as e:
+                # Fallback: if trash move fails (e.g. Flatpak filesystem quirk), just delete it permanently
+                try:
+                    editor.file_path.unlink(missing_ok=True)
+                    self.last_deleted_file = None
+                    toast_msg = "Note permanently deleted"
+                except Exception as e2:
+                    toast_msg = f"Failed to delete: {e2}"
 
             if hasattr(self, 'current_toast') and self.current_toast:
                 self.current_toast.dismiss()
 
-            self.current_toast = Adw.Toast.new("Note deleted")
+            self.current_toast = Adw.Toast.new(toast_msg)
             self.current_toast.set_timeout(3)
             self.toast_overlay.add_toast(self.current_toast)
 

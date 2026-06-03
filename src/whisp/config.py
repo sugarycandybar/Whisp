@@ -50,4 +50,4 @@ class Config:
 
 config = Config()
 DATA_DIR = config.data_dir
-TRASH_DIR = DATA_DIR.parent / ".trash"
+TRASH_DIR = DATA_DIR / ".trash"

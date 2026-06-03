@@ -47,9 +47,9 @@
   <content_rating type="oars-1.1" />
 
   <releases>
-    <release version="1.0.7" date="2026-06-03">
+    <release version="1.0.8" date="2026-06-03">
       <description>
-        <p>Fixed a Flatpak filesystem bug where deleting notes would fail silently. Made the About dialog version number dynamic to ensure it's always up-to-date.</p>
+        <p>Fixed a severe Flatpak Document Portal permission error that caused permanent deletion when using custom Note directories.</p>
       </description>
     </release>
     <release version="1.0.6" date="2026-06-02">

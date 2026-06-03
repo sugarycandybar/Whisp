@@ -735,7 +735,7 @@ class WhispWindow(Adw.ApplicationWindow):
             if new_dir != DATA_DIR:
                 config.data_dir = new_dir
                 DATA_DIR = new_dir
-                TRASH_DIR = DATA_DIR.parent / ".trash"
+                TRASH_DIR = DATA_DIR / ".trash"
                 row.set_subtitle(str(DATA_DIR))
                 
                 DATA_DIR.mkdir(parents=True, exist_ok=True)

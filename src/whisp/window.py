@@ -466,8 +466,15 @@ class WhispWindow(Adw.ApplicationWindow):
         if editor.file_path.exists():
             try:
                 TRASH_DIR.mkdir(parents=True, exist_ok=True)
+                dest_path = TRASH_DIR / editor.file_path.name
+                
+                # shutil.move crashes if the destination file already exists (e.g. deleting two "Untitled Note.txt"s).
+                # We must delete the old trashed note first if it shares the same name.
+                if dest_path.exists():
+                    dest_path.unlink()
+                    
                 # Try to move to trash first
-                shutil.move(str(editor.file_path), str(TRASH_DIR / editor.file_path.name))
+                shutil.move(str(editor.file_path), str(dest_path))
                 self.last_deleted_file = editor.file_path.name
                 toast_msg = "Note deleted"
             except Exception as e:
@@ -475,9 +482,9 @@ class WhispWindow(Adw.ApplicationWindow):
                 try:
                     editor.file_path.unlink(missing_ok=True)
                     self.last_deleted_file = None
-                    toast_msg = "Note permanently deleted"
+                    toast_msg = f"Permanent delete fallback (Error: {str(e)})"
                 except Exception as e2:
-                    toast_msg = f"Failed to delete: {e2}"
+                    toast_msg = f"Failed to delete completely: {e2}"
 
             if hasattr(self, 'current_toast') and self.current_toast:
                 self.current_toast.dismiss()

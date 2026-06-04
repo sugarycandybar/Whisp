@@ -146,6 +146,9 @@ shortcuts_xml = """
 """
 
 class WhispWindow(Adw.ApplicationWindow):
+    # Cap of result rows shown per note; extra matches are summarised in one row.
+    MAX_MATCHES_PER_NOTE = 8
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         
@@ -258,6 +261,7 @@ class WhispWindow(Adw.ApplicationWindow):
         self.popover.set_child(popover_box)
 
         self.search_entry = Gtk.SearchEntry()
+        self.search_timeout_id = 0
         self.search_entry.connect("search-changed", self.on_search_changed)
         self.search_entry.connect("stop-search", lambda e: self.popover.popdown())
         popover_box.append(self.search_entry)
@@ -681,6 +685,9 @@ class WhispWindow(Adw.ApplicationWindow):
             self.populate_note_list()
             self.search_entry.grab_focus()
         else:
+            if self.search_timeout_id:
+                GLib.source_remove(self.search_timeout_id)
+                self.search_timeout_id = 0
             for i in range(self.carousel.get_n_pages()):
                 self.carousel.get_nth_page(i).set_search_highlight("")
             editor = self.get_current_editor()
@@ -751,8 +758,10 @@ class WhispWindow(Adw.ApplicationWindow):
                 body_matches = self._find_body_matches(content, search_text)
 
             if body_matches:
-                # One row per occurrence; title/tags only on the first, rest indented.
-                for n, idx in enumerate(body_matches):
+                # One row per occurrence, capped: a frequent term in a large note
+                # could otherwise spawn thousands of widgets and freeze the UI.
+                shown = body_matches[:self.MAX_MATCHES_PER_NOTE]
+                for n, idx in enumerate(shown):
                     is_first = n == 0
                     row = self._make_note_row(f, indent=not is_first)
                     vbox = row.get_child()
@@ -777,6 +786,15 @@ class WhispWindow(Adw.ApplicationWindow):
                     row.match_index = n
                     row.match_term = search_text
                     self.note_listbox.append(row)
+
+                extra = len(body_matches) - len(shown)
+                if extra > 0:
+                    info_row = self._make_note_row(f, indent=True)
+                    info_label = Gtk.Label(label=f"… +{extra} more matches", xalign=0)
+                    info_label.add_css_class("dim-label")
+                    info_row.get_child().append(info_label)
+                    # No match_index → activating it just opens the note.
+                    self.note_listbox.append(info_row)
             else:
                 row = self._make_note_row(f)
                 vbox = row.get_child()
@@ -801,10 +819,19 @@ class WhispWindow(Adw.ApplicationWindow):
         return row
 
     def on_search_changed(self, entry):
-        self.populate_note_list(entry.get_text())
+        # Debounce: searching reads every note from disk and rebuilds the whole
+        # list, so doing it on every keystroke freezes the UI on large notes.
+        if self.search_timeout_id:
+            GLib.source_remove(self.search_timeout_id)
+        self.search_timeout_id = GLib.timeout_add(150, self._run_search, entry.get_text())
+
+    def _run_search(self, text):
+        self.search_timeout_id = 0
+        self.populate_note_list(text)
         editor = self.get_current_editor()
         if editor:
-            editor.set_search_highlight(entry.get_text())
+            editor.set_search_highlight(text)
+        return False
 
     def on_note_row_activated(self, listbox, row):
         file_path = getattr(row, 'file_path', None)

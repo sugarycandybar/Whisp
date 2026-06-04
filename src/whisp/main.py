@@ -36,8 +36,60 @@ class WhispApp(Adw.Application):
         css_provider = Gtk.CssProvider()
         css_provider.load_from_data(b"""
             window.background { background-color: @view_bg_color; }
-            textview { background-color: transparent; }
+            textview { 
+                background-color: transparent; 
+            }
+            textview > text {
+                padding: 0 8px; /* Prevent left-edge glyph clipping */
+            }
+            toast {
+                margin-left: 48px;
+                margin-right: 48px;
+            }
             window.about image.icon { transform: scale(0.8); }
+
+            /* Paper Themes */
+            .paper-dotted {
+                background-image: radial-gradient(circle, alpha(currentColor, 0.15) 1px, transparent 1px);
+                background-size: 20px 20px;
+                background-position: 0 0;
+            }
+            .paper-grid {
+                background-image: linear-gradient(to right, alpha(currentColor, 0.1) 1px, transparent 1px),
+                                  linear-gradient(to bottom, alpha(currentColor, 0.1) 1px, transparent 1px);
+                background-size: 14px 14px;
+                background-position: 0 0;
+            }
+            .paper-large_grid {
+                background-image: linear-gradient(to right, alpha(currentColor, 0.1) 1px, transparent 1px),
+                                  linear-gradient(to bottom, alpha(currentColor, 0.1) 1px, transparent 1px);
+                background-size: 36px 36px;
+                background-position: 0 0;
+            }
+            .paper-blank { background-image: none; }
+            
+            /* Snippet styling */
+            .theme-snippet-btn {
+                padding: 4px;
+                border-radius: 12px;
+                border: 2px solid transparent;
+            }
+            .theme-snippet-btn:checked {
+                border-color: @accent_bg_color;
+                background-color: transparent;
+            }
+            .theme-snippet-preview {
+                min-width: 120px;
+                min-height: 80px;
+                border-radius: 8px;
+                border: 1px solid alpha(currentColor, 0.15);
+                background-color: @view_bg_color;
+                padding: 12px 8px;
+            }
+            .fake-text-line {
+                background-color: alpha(currentColor, 0.3);
+                border-radius: 2px;
+            }
         """)
         Gtk.StyleContext.add_provider_for_display(
             Gdk.Display.get_default(),

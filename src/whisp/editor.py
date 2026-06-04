@@ -25,6 +25,7 @@ class NoteEditor(Gtk.Overlay):
         self.textview.set_right_margin(32)
         self.textview.set_top_margin(32)
         self.textview.set_bottom_margin(32)
+        self.textview.add_css_class(f"paper-{config.get('paper_theme', 'blank')}")
         self.scrolled.set_child(self.textview)
         
         self.buffer = self.textview.get_buffer()

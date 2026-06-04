@@ -6,6 +6,28 @@ from gi.repository import Gtk, Adw, Gdk, Gio, GLib, Pango
 from whisp.config import config, DATA_DIR, TRASH_DIR
 from whisp.editor import NoteEditor
 
+class ThemeSnippet(Gtk.ToggleButton):
+    def __init__(self, theme_id, group=None):
+        super().__init__(group=group)
+        self.theme_id = theme_id
+        self.set_valign(Gtk.Align.CENTER)
+        self.set_halign(Gtk.Align.CENTER)
+        self.add_css_class("theme-snippet-btn")
+        
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        box.add_css_class("theme-snippet-preview")
+        box.add_css_class(f"paper-{theme_id}")
+        
+        # Add fake text lines to simulate an editor
+        for width in [60, 80, 40]:
+            line = Gtk.Box()
+            line.add_css_class("fake-text-line")
+            line.set_size_request(width, 4)
+            line.set_halign(Gtk.Align.START)
+            box.append(line)
+            
+        self.set_child(box)
+
 shortcuts_xml = """
 <interface>
   <object class="GtkShortcutsWindow" id="shortcuts_window">
@@ -452,14 +474,32 @@ class WhispWindow(Adw.ApplicationWindow):
             self.carousel.insert(editor, index)
         else:
             self.carousel.append(editor)
-        # Disable animation for instant snappy feeling
         if grab_focus:
-            self.carousel.scroll_to(editor, False)
-            GLib.idle_add(lambda: [editor.textview.grab_focus(), False][-1])
-            self.update_title()
+            def grab_it():
+                self.carousel.scroll_to(editor, False)
+                editor.textview.grab_focus()
+                self.update_title()
+                return False
+            GLib.idle_add(grab_it)
+            GLib.timeout_add(50, grab_it)
+            GLib.timeout_add(150, grab_it)
         self.update_line_spacing()
 
     def ensure_empty_note_at_end(self):
+        n_pages = self.carousel.get_n_pages()
+        if n_pages == 0:
+            self.add_note(grab_focus=False)
+            return
+            
+        # If there are any empty notes that are NOT at the end, remove them
+        # (This fixes the "empty note at the start" bug)
+        for i in range(n_pages - 1, -1, -1):
+            editor = self.carousel.get_nth_page(i)
+            if editor.is_empty():
+                if i != self.carousel.get_n_pages() - 1:
+                    self.carousel.remove(editor)
+                    
+        # Check if the new last note is empty
         n_pages = self.carousel.get_n_pages()
         if n_pages == 0:
             self.add_note(grab_focus=False)
@@ -566,7 +606,10 @@ class WhispWindow(Adw.ApplicationWindow):
             self.current_toast.dismiss()
 
         self.current_toast = Adw.Toast.new(toast_msg)
-        self.current_toast.set_timeout(3)
+        if self.last_deleted_file:
+            self.current_toast.set_button_label("Undo")
+            self.current_toast.set_action_name("win.undo-delete")
+        self.current_toast.set_timeout(5)
         self.toast_overlay.add_toast(self.current_toast)
 
         self.carousel.remove(editor)
@@ -683,22 +726,35 @@ class WhispWindow(Adw.ApplicationWindow):
         font_row.add_suffix(font_btn)
         font_group.add(font_row)
         
-        # Paper Theme
-        theme_row = Adw.ActionRow(title="Paper Theme")
-        theme_model = Gtk.StringList.new(["blank", "dotted", "grid"])
-        theme_dropdown = Gtk.DropDown(model=theme_model)
-        theme_dropdown.set_valign(Gtk.Align.CENTER)
+        # Theme Snippets Group
+        theme_group = Adw.PreferencesGroup(title="Paper Theme")
         
+        flowbox = Gtk.FlowBox()
+        flowbox.set_valign(Gtk.Align.START)
+        flowbox.set_selection_mode(Gtk.SelectionMode.NONE)
+        flowbox.set_max_children_per_line(3)
+        flowbox.set_min_children_per_line(1)
+        flowbox.set_row_spacing(12)
+        flowbox.set_column_spacing(12)
+        flowbox.set_margin_top(8)
+        flowbox.set_margin_bottom(8)
+        
+        themes = ["blank", "dotted", "grid", "large_grid"]
         current_theme = config.get("paper_theme", "blank")
-        try:
-            theme_idx = ["blank", "dotted", "grid"].index(current_theme)
-            theme_dropdown.set_selected(theme_idx)
-        except ValueError:
-            pass
+        
+        group = None
+        for t in themes:
+            snippet = ThemeSnippet(t, group=group)
+            if group is None:
+                group = snippet
+            if t == current_theme:
+                snippet.set_active(True)
+                
+            snippet.connect("toggled", self.on_theme_snippet_toggled)
+            flowbox.append(snippet)
             
-        theme_dropdown.connect("notify::selected-item", self.on_theme_changed)
-        theme_row.add_suffix(theme_dropdown)
-        font_group.add(theme_row)
+        theme_group.add(flowbox)
+        page.add(theme_group)
         
         # Line Spacing
         spacing_row = Adw.ActionRow(title="Line Spacing")
@@ -772,12 +828,17 @@ class WhispWindow(Adw.ApplicationWindow):
             config.set("font_name", font_name)
             self.apply_theme()
 
-    def on_theme_changed(self, dropdown, param):
-        selected = dropdown.get_selected_item()
-        if selected:
-            theme = selected.get_string()
-            config.set("paper_theme", theme)
-            self.apply_theme()
+    def on_theme_snippet_toggled(self, snippet):
+        if snippet.get_active():
+            old_theme = config.get("paper_theme", "blank")
+            theme_id = snippet.theme_id
+            config.set("paper_theme", theme_id)
+            
+            # Update all open editors
+            for i in range(self.carousel.get_n_pages()):
+                editor = self.carousel.get_nth_page(i)
+                editor.textview.remove_css_class(f"paper-{old_theme}")
+                editor.textview.add_css_class(f"paper-{theme_id}")
 
     def on_spacing_changed(self, dropdown, param):
         selected = dropdown.get_selected_item()
@@ -865,27 +926,8 @@ class WhispWindow(Adw.ApplicationWindow):
             size = font_desc.get_size() / Pango.SCALE
             font_css = f"font-family: '{family}'; font-size: {size}pt;"
             
-        theme = config.get("paper_theme", "blank")
-        bg_css = ""
-        
-        if theme == "dotted":
-            bg_css = """
-                background-image: radial-gradient(circle, alpha(currentColor, 0.15) 1px, transparent 1px);
-                background-size: 20px 20px;
-                background-position: 0 0;
-            """
-        elif theme == "grid":
-            bg_css = """
-                background-image: linear-gradient(to right, alpha(currentColor, 0.1) 1px, transparent 1px),
-                                  linear-gradient(to bottom, alpha(currentColor, 0.1) 1px, transparent 1px);
-                background-size: 14px 14px;
-                background-position: 0 0;
-            """
-        else:
-            bg_css = "background-image: none;"
-            
         custom_css = f"""
-        textview {{ {font_css} {bg_css} }}
+        textview {{ {font_css} }}
         
         .theme-btn {{
             min-width: 48px;

@@ -47,7 +47,20 @@
   <content_rating type="oars-1.1" />
 
   <releases>
-    <release version="1.1.0" date="2026-06-03">
+    <release version="1.2.0" date="2026-06-04">
+      <description>
+        <p>Added a new visual Appearance selector and new Paper Themes:</p>
+        <ul>
+          <li>Replaced the basic dropdown menu with a visual Grid selector for Paper Themes, showing live miniature snippets of how your notes will look.</li>
+          <li>Added a new 'Large Grid' paper background option.</li>
+          <li>Added a visual Theme Switcher in the main menu to easily toggle between System, Light, and Dark modes.</li>
+          <li>Added a Startup Behavior preference to choose whether the app restores your last active note or starts with a fresh empty draft.</li>
+          <li>Added an interactive 'Undo' button directly to the note deletion popup toast for immediate and reliable recovery.</li>
+          <li>Fixed a race condition where quickly deleting a note using a keyboard shortcut would occasionally cause the note to save itself in the background as a "ghost note".</li>
+        </ul>
+      </description>
+    </release>
+    <release version="1.0.9" date="2026-06-03">
       <description>
         <p>Added new Quality of Life features and fixed critical bugs:</p>
         <ul>

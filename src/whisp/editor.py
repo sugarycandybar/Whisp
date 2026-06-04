@@ -533,6 +533,23 @@ class NoteEditor(Gtk.Overlay):
             self.buffer.set_text(content)
             self.highlighter.highlight()
 
+    def set_search_highlight(self, term):
+        self.highlighter.set_search_term(term)
+
+    def scroll_to_match(self, offset, length):
+        # Defer + retry: a just-inserted editor has no layout yet to scroll to.
+        def do_scroll():
+            n = self.buffer.get_char_count()
+            start = self.buffer.get_iter_at_offset(min(offset, n))
+            end = self.buffer.get_iter_at_offset(min(offset + length, n))
+            self.buffer.select_range(start, end)
+            self.textview.scroll_to_mark(self.buffer.get_insert(), 0.1, True, 0.0, 0.3)
+            self.textview.grab_focus()
+            return False
+        GLib.idle_add(do_scroll)
+        GLib.timeout_add(80, do_scroll)
+        GLib.timeout_add(180, do_scroll)
+
     def save_file(self):
         self.save_timeout_id = 0
         start, end = self.buffer.get_bounds()

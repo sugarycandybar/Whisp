@@ -536,13 +536,32 @@ class NoteEditor(Gtk.Overlay):
     def set_search_highlight(self, term):
         self.highlighter.set_search_term(term)
 
-    def scroll_to_match(self, offset, length):
+    def scroll_to_match(self, term, occurrence_index):
+        # Locate the match in the live buffer (not via a disk offset): an open
+        # editor's buffer can diverge from the file on disk (e.g. unsaved Tab
+        # indentation), which would make a raw offset select the wrong span.
+        # We navigate to the Nth body occurrence — matching window.py's count.
+        if not term:
+            return
         # Defer + retry: a just-inserted editor has no layout yet to scroll to.
         def do_scroll():
-            n = self.buffer.get_char_count()
-            start = self.buffer.get_iter_at_offset(min(offset, n))
-            end = self.buffer.get_iter_at_offset(min(offset + length, n))
-            self.buffer.select_range(start, end)
+            start, end = self.buffer.get_bounds()
+            text = self.buffer.get_text(start, end, True)
+            low = text.lower()
+            t = term.lower()
+            nl = low.find('\n')
+            search_from = nl + 1 if nl != -1 else len(low)
+            offsets = []
+            i = low.find(t, search_from)
+            while i != -1:
+                offsets.append(i)
+                i = low.find(t, i + len(t))
+            if not offsets:
+                return False
+            offset = offsets[min(occurrence_index, len(offsets) - 1)]
+            s_iter = self.buffer.get_iter_at_offset(offset)
+            e_iter = self.buffer.get_iter_at_offset(offset + len(t))
+            self.buffer.select_range(s_iter, e_iter)
             self.textview.scroll_to_mark(self.buffer.get_insert(), 0.1, True, 0.0, 0.3)
             self.textview.grab_focus()
             return False

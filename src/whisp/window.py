@@ -687,12 +687,15 @@ class WhispWindow(Adw.ApplicationWindow):
             if editor:
                 editor.textview.grab_focus()
 
-    def _find_body_matches(self, content, first_line, search_text):
-        # Offsets of every occurrence in the body (skipping the title line); these
-        # map 1:1 to the editor's TextBuffer offsets.
+    def _find_body_matches(self, content, search_text):
+        # Offsets of every occurrence in the body, skipping the title (first) line.
+        # The editor navigates by occurrence index (see scroll_to_match), so the
+        # "skip the first line" rule here must match the editor's exactly.
+        nl = content.find('\n')
+        start_from = nl + 1 if nl != -1 else len(content)
         matches = []
         low = content.lower()
-        i = low.find(search_text, len(first_line))
+        i = low.find(search_text, start_from)
         while i != -1:
             matches.append(i)
             i = low.find(search_text, i + len(search_text))
@@ -745,7 +748,7 @@ class WhispWindow(Adw.ApplicationWindow):
                 searchable = (title + " " + tag_str + " " + content).lower()
                 if search_text not in searchable:
                     continue
-                body_matches = self._find_body_matches(content, first_line, search_text)
+                body_matches = self._find_body_matches(content, search_text)
 
             if body_matches:
                 # One row per occurrence; title/tags only on the first, rest indented.
@@ -768,8 +771,11 @@ class WhispWindow(Adw.ApplicationWindow):
                     snippet_label.set_wrap(False)
                     vbox.append(snippet_label)
 
-                    row.match_offset = idx
-                    row.match_len = len(search_text)
+                    # Navigate by occurrence index, not file offset: the open
+                    # editor's buffer can differ from disk (e.g. unsaved Tab
+                    # indentation), so a raw offset would mis-select.
+                    row.match_index = n
+                    row.match_term = search_text
                     self.note_listbox.append(row)
             else:
                 row = self._make_note_row(f)
@@ -790,8 +796,8 @@ class WhispWindow(Adw.ApplicationWindow):
         vbox.set_margin_bottom(8)
         row.set_child(vbox)
         row.file_path = file_path
-        row.match_offset = None
-        row.match_len = 0
+        row.match_index = None
+        row.match_term = ""
         return row
 
     def on_search_changed(self, entry):
@@ -815,9 +821,9 @@ class WhispWindow(Adw.ApplicationWindow):
             if target is None:
                 target = self.add_note(file_path)
 
-            match_offset = getattr(row, 'match_offset', None)
-            if match_offset is not None:
-                target.scroll_to_match(match_offset, getattr(row, 'match_len', 0))
+            match_index = getattr(row, 'match_index', None)
+            if match_index is not None:
+                target.scroll_to_match(getattr(row, 'match_term', ''), match_index)
 
             self.update_title()
         self.popover.popdown()

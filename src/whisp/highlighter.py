@@ -198,7 +198,7 @@ class MarkdownHighlighter:
             end_iter = self.buffer.get_iter_at_offset(m.end())
             self.buffer.apply_tag(self.tag_comment, start_iter, end_iter)
 
-        # Re-applied on every highlight() so it survives the remove_all_tags above.
+        # Re-applied each highlight(), after the remove_all_tags above.
         if self.search_term:
             for m in re.finditer(re.escape(self.search_term), text, re.IGNORECASE):
                 s_iter = self.buffer.get_iter_at_offset(m.start())

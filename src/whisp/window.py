@@ -5,6 +5,7 @@ from pathlib import Path
 from gi.repository import Gtk, Adw, Gdk, Gio, GLib, Pango
 from whisp.config import config, DATA_DIR, TRASH_DIR
 from whisp.editor import NoteEditor
+from whisp.text_search import body_match_offsets
 
 class ThemeSnippet(Gtk.ToggleButton):
     def __init__(self, theme_id, group=None):
@@ -146,9 +147,7 @@ shortcuts_xml = """
 """
 
 class WhispWindow(Adw.ApplicationWindow):
-    # Number of result rows realised per page; more are rendered as the user
-    # scrolls (see _render_next_page / on_search_scrolled).
-    PAGE_SIZE = 20
+    PAGE_SIZE = 20  # result rows rendered per page; more load as the user scrolls
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -255,7 +254,6 @@ class WhispWindow(Adw.ApplicationWindow):
         popover_box.set_margin_bottom(12)
         popover_box.set_margin_start(12)
         popover_box.set_margin_end(12)
-        # Fixed content width; the popover grows to fit its child.
         popover_box.set_size_request(380, -1)
         self.popover.set_child(popover_box)
 
@@ -271,10 +269,7 @@ class WhispWindow(Adw.ApplicationWindow):
         scrolled.set_min_content_width(320)
         scrolled.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
         self.search_scrolled = scrolled
-        # Infinite scroll: load the next batch of matches on reaching the bottom,
-        # so the user keeps scrolling instead of clicking (a click would destroy
-        # the row under the pointer and GTK wouldn't redirect the wheel until the
-        # mouse moves again).
+        # Infinite scroll: load more on reaching the bottom; prefetch before it.
         scrolled.connect("edge-reached", self.on_search_edge_reached)
         scrolled.get_vadjustment().connect("value-changed", self.on_search_scrolled)
         popover_box.append(scrolled)
@@ -701,20 +696,6 @@ class WhispWindow(Adw.ApplicationWindow):
             if editor:
                 editor.textview.grab_focus()
 
-    def _find_body_matches(self, content, search_text):
-        # Offsets of every occurrence in the body, skipping the title (first) line.
-        # The editor navigates by occurrence index (see scroll_to_match), so the
-        # "skip the first line" rule here must match the editor's exactly.
-        nl = content.find('\n')
-        start_from = nl + 1 if nl != -1 else len(content)
-        matches = []
-        low = content.lower()
-        i = low.find(search_text, start_from)
-        while i != -1:
-            matches.append(i)
-            i = low.find(search_text, i + len(search_text))
-        return matches
-
     def _build_snippet_markup(self, content, idx, search_text):
         # Asymmetric context: keep the match near the start of the snippet so
         # the highlight stays visible before the label ellipsizes at the end.
@@ -747,10 +728,8 @@ class WhispWindow(Adw.ApplicationWindow):
         search_text = search_text.lower()
         files = sorted(DATA_DIR.glob("*.md"), key=lambda f: os.path.getmtime(f) if f.exists() else 0, reverse=True)
 
-        # Build a flat stream of every row to show (notes and per-match snippets)
-        # but only realise widgets a page at a time, growing as the user scrolls.
-        # Computing all match offsets is cheap; building thousands of widgets is
-        # what freezes the UI, so that is what we defer.
+        # Collect all rows but realise widgets a page at a time (building thousands
+        # at once freezes the UI).
         pending = []
         for f in files:
             content = f.read_text(encoding='utf-8') if f.exists() else ""
@@ -760,14 +739,14 @@ class WhispWindow(Adw.ApplicationWindow):
             title = re.sub(r'^#+\s*', '', first_line) if first_line else "New Note"
 
             tags = set(re.findall(r'#(\w+)', content))
-            tag_str = " ".join([f"#{t}" for t in tags])
+            tag_str = " ".join(f"#{t}" for t in tags)
 
             body_matches = []
             if search_text:
                 searchable = (title + " " + tag_str + " " + content).lower()
                 if search_text not in searchable:
                     continue
-                body_matches = self._find_body_matches(content, search_text)
+                body_matches = body_match_offsets(content, search_text)
 
             if body_matches:
                 for n, idx in enumerate(body_matches):
@@ -792,17 +771,19 @@ class WhispWindow(Adw.ApplicationWindow):
     def _row_from_descriptor(self, d):
         if d.get("plain"):
             row = self._make_note_row(d["file"])
-            vbox = row.get_child()
-            vbox.append(Gtk.Label(label=d["title"], xalign=0))
-            if d["tag_str"]:
-                tag_label = Gtk.Label(label=d["tag_str"], xalign=0)
-                tag_label.add_css_class("dim-label")
-                vbox.append(tag_label)
+            self._append_header(row.get_child(), d["title"], d["tag_str"])
             return row
         return self._make_snippet_row(
             d["file"], d["content"], d["idx"], d["occurrence"], d["search"],
             title=d["title"], tag_str=d["tag_str"],
         )
+
+    def _append_header(self, vbox, title, tag_str):
+        vbox.append(Gtk.Label(label=title, xalign=0))
+        if tag_str:
+            tag_label = Gtk.Label(label=tag_str, xalign=0)
+            tag_label.add_css_class("dim-label")
+            vbox.append(tag_label)
 
     def _make_note_row(self, file_path, indent=False):
         row = Gtk.ListBoxRow()
@@ -818,16 +799,11 @@ class WhispWindow(Adw.ApplicationWindow):
         return row
 
     def _make_snippet_row(self, f, content, idx, occurrence_index, search_text, title=None, tag_str=None):
-        # title/tag_str are only passed for the first match of a note; the rest
-        # are indented snippet-only rows.
+        # title/tag_str only on a note's first match; the rest are indented.
         row = self._make_note_row(f, indent=title is None)
         vbox = row.get_child()
         if title is not None:
-            vbox.append(Gtk.Label(label=title, xalign=0))
-            if tag_str:
-                tag_label = Gtk.Label(label=tag_str, xalign=0)
-                tag_label.add_css_class("dim-label")
-                vbox.append(tag_label)
+            self._append_header(vbox, title, tag_str)
 
         snippet_label = Gtk.Label(xalign=0)
         snippet_label.set_markup(self._build_snippet_markup(content, idx, search_text))
@@ -836,22 +812,18 @@ class WhispWindow(Adw.ApplicationWindow):
         snippet_label.set_wrap(False)
         vbox.append(snippet_label)
 
-        # Navigate by occurrence index, not file offset: the open editor's buffer
-        # can differ from disk (e.g. unsaved Tab indentation), so a raw offset
-        # would mis-select.
+        # Navigate by occurrence index (the buffer can differ from disk).
         row.match_index = occurrence_index
         row.match_term = search_text
         return row
 
     def on_search_edge_reached(self, scrolled, pos):
-        # Backstop: if a fast scroll outruns the prefetch and hits the bottom,
-        # render the next page immediately.
+        # Backstop in case a fast scroll outruns the prefetch.
         if pos == Gtk.PositionType.BOTTOM:
             self._render_next_page()
 
     def on_search_scrolled(self, vadj):
-        # Prefetch the next page while still a screenful away from the bottom, so
-        # the incremental loading stays invisible to the user.
+        # Prefetch a screenful early so loading stays invisible.
         if not self._pending_rows:
             return
         remaining_below = vadj.get_upper() - (vadj.get_value() + vadj.get_page_size())
@@ -859,8 +831,7 @@ class WhispWindow(Adw.ApplicationWindow):
             self._render_next_page()
 
     def on_search_changed(self, entry):
-        # Debounce: searching reads every note from disk and rebuilds the whole
-        # list, so doing it on every keystroke freezes the UI on large notes.
+        # Debounce: each search rereads every note and rebuilds the list.
         if self.search_timeout_id:
             GLib.source_remove(self.search_timeout_id)
         self.search_timeout_id = GLib.timeout_add(150, self._run_search, entry.get_text())

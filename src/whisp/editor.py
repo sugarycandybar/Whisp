@@ -4,6 +4,7 @@ from pathlib import Path
 from gi.repository import Gtk, GLib, Gdk
 from whisp.config import config, DATA_DIR
 from whisp.highlighter import MarkdownHighlighter
+from whisp.text_search import body_match_offsets
 
 class NoteEditor(Gtk.Overlay):
     def __init__(self, file_path=None, on_title_changed=None):
@@ -537,30 +538,18 @@ class NoteEditor(Gtk.Overlay):
         self.highlighter.set_search_term(term)
 
     def scroll_to_match(self, term, occurrence_index):
-        # Locate the match in the live buffer (not via a disk offset): an open
-        # editor's buffer can diverge from the file on disk (e.g. unsaved Tab
-        # indentation), which would make a raw offset select the wrong span.
-        # We navigate to the Nth body occurrence — matching window.py's count.
+        # Search the live buffer, not a disk offset (an open editor can diverge).
         if not term:
             return
-        # Defer + retry: a just-inserted editor has no layout yet to scroll to.
+        # Defer + retry: a just-inserted editor has no layout to scroll to yet.
         def do_scroll():
             start, end = self.buffer.get_bounds()
-            text = self.buffer.get_text(start, end, True)
-            low = text.lower()
-            t = term.lower()
-            nl = low.find('\n')
-            search_from = nl + 1 if nl != -1 else len(low)
-            offsets = []
-            i = low.find(t, search_from)
-            while i != -1:
-                offsets.append(i)
-                i = low.find(t, i + len(t))
+            offsets = body_match_offsets(self.buffer.get_text(start, end, True), term)
             if not offsets:
                 return False
             offset = offsets[min(occurrence_index, len(offsets) - 1)]
             s_iter = self.buffer.get_iter_at_offset(offset)
-            e_iter = self.buffer.get_iter_at_offset(offset + len(t))
+            e_iter = self.buffer.get_iter_at_offset(offset + len(term))
             self.buffer.select_range(s_iter, e_iter)
             self.textview.scroll_to_mark(self.buffer.get_insert(), 0.1, True, 0.0, 0.3)
             self.textview.grab_focus()

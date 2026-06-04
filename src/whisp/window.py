@@ -146,8 +146,9 @@ shortcuts_xml = """
 """
 
 class WhispWindow(Adw.ApplicationWindow):
-    # Cap of result rows shown per note; extra matches are summarised in one row.
-    MAX_MATCHES_PER_NOTE = 8
+    # Number of result rows realised per page; more are rendered as the user
+    # scrolls (see _render_next_page / on_search_scrolled).
+    PAGE_SIZE = 20
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -246,8 +247,6 @@ class WhispWindow(Adw.ApplicationWindow):
         self.header_bar.pack_end(self.search_btn)
 
         self.popover = Gtk.Popover()
-        # Non-modal so the note behind stays scrollable; closed via Escape or the button.
-        self.popover.set_autohide(False)
         self.search_btn.set_popover(self.popover)
         self.popover.connect("notify::visible", self.on_popover_visible)
 
@@ -262,6 +261,7 @@ class WhispWindow(Adw.ApplicationWindow):
 
         self.search_entry = Gtk.SearchEntry()
         self.search_timeout_id = 0
+        self._pending_rows = []
         self.search_entry.connect("search-changed", self.on_search_changed)
         self.search_entry.connect("stop-search", lambda e: self.popover.popdown())
         popover_box.append(self.search_entry)
@@ -270,6 +270,13 @@ class WhispWindow(Adw.ApplicationWindow):
         scrolled.set_min_content_height(200)
         scrolled.set_min_content_width(320)
         scrolled.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        self.search_scrolled = scrolled
+        # Infinite scroll: load the next batch of matches on reaching the bottom,
+        # so the user keeps scrolling instead of clicking (a click would destroy
+        # the row under the pointer and GTK wouldn't redirect the wheel until the
+        # mouse moves again).
+        scrolled.connect("edge-reached", self.on_search_edge_reached)
+        scrolled.get_vadjustment().connect("value-changed", self.on_search_scrolled)
         popover_box.append(scrolled)
 
         self.note_listbox = Gtk.ListBox()
@@ -736,20 +743,25 @@ class WhispWindow(Adw.ApplicationWindow):
         # Clear existing rows
         while child := self.note_listbox.get_first_child():
             self.note_listbox.remove(child)
-            
+
         search_text = search_text.lower()
         files = sorted(DATA_DIR.glob("*.md"), key=lambda f: os.path.getmtime(f) if f.exists() else 0, reverse=True)
-        
+
+        # Build a flat stream of every row to show (notes and per-match snippets)
+        # but only realise widgets a page at a time, growing as the user scrolls.
+        # Computing all match offsets is cheap; building thousands of widgets is
+        # what freezes the UI, so that is what we defer.
+        pending = []
         for f in files:
             content = f.read_text(encoding='utf-8') if f.exists() else ""
             if not content.strip():
                 continue
             first_line = content.split('\n')[0].strip() if content else ""
             title = re.sub(r'^#+\s*', '', first_line) if first_line else "New Note"
-            
+
             tags = set(re.findall(r'#(\w+)', content))
             tag_str = " ".join([f"#{t}" for t in tags])
-            
+
             body_matches = []
             if search_text:
                 searchable = (title + " " + tag_str + " " + content).lower()
@@ -758,52 +770,39 @@ class WhispWindow(Adw.ApplicationWindow):
                 body_matches = self._find_body_matches(content, search_text)
 
             if body_matches:
-                # One row per occurrence, capped: a frequent term in a large note
-                # could otherwise spawn thousands of widgets and freeze the UI.
-                shown = body_matches[:self.MAX_MATCHES_PER_NOTE]
-                for n, idx in enumerate(shown):
-                    is_first = n == 0
-                    row = self._make_note_row(f, indent=not is_first)
-                    vbox = row.get_child()
-
-                    if is_first:
-                        vbox.append(Gtk.Label(label=title, xalign=0))
-                        if tag_str:
-                            tag_label = Gtk.Label(label=tag_str, xalign=0)
-                            tag_label.add_css_class("dim-label")
-                            vbox.append(tag_label)
-
-                    snippet_label = Gtk.Label(xalign=0)
-                    snippet_label.set_markup(self._build_snippet_markup(content, idx, search_text))
-                    snippet_label.add_css_class("dim-label")
-                    snippet_label.set_ellipsize(Pango.EllipsizeMode.END)
-                    snippet_label.set_wrap(False)
-                    vbox.append(snippet_label)
-
-                    # Navigate by occurrence index, not file offset: the open
-                    # editor's buffer can differ from disk (e.g. unsaved Tab
-                    # indentation), so a raw offset would mis-select.
-                    row.match_index = n
-                    row.match_term = search_text
-                    self.note_listbox.append(row)
-
-                extra = len(body_matches) - len(shown)
-                if extra > 0:
-                    info_row = self._make_note_row(f, indent=True)
-                    info_label = Gtk.Label(label=f"… +{extra} more matches", xalign=0)
-                    info_label.add_css_class("dim-label")
-                    info_row.get_child().append(info_label)
-                    # No match_index → activating it just opens the note.
-                    self.note_listbox.append(info_row)
+                for n, idx in enumerate(body_matches):
+                    pending.append({
+                        "file": f, "content": content, "idx": idx, "occurrence": n,
+                        "search": search_text,
+                        "title": title if n == 0 else None,
+                        "tag_str": tag_str if n == 0 else None,
+                    })
             else:
-                row = self._make_note_row(f)
-                vbox = row.get_child()
-                vbox.append(Gtk.Label(label=title, xalign=0))
-                if tag_str:
-                    tag_label = Gtk.Label(label=tag_str, xalign=0)
-                    tag_label.add_css_class("dim-label")
-                    vbox.append(tag_label)
-                self.note_listbox.append(row)
+                pending.append({"file": f, "plain": True, "title": title, "tag_str": tag_str})
+
+        self._pending_rows = pending
+        self._render_next_page()
+
+    def _render_next_page(self):
+        count = 0
+        while self._pending_rows and count < self.PAGE_SIZE:
+            self.note_listbox.append(self._row_from_descriptor(self._pending_rows.pop(0)))
+            count += 1
+
+    def _row_from_descriptor(self, d):
+        if d.get("plain"):
+            row = self._make_note_row(d["file"])
+            vbox = row.get_child()
+            vbox.append(Gtk.Label(label=d["title"], xalign=0))
+            if d["tag_str"]:
+                tag_label = Gtk.Label(label=d["tag_str"], xalign=0)
+                tag_label.add_css_class("dim-label")
+                vbox.append(tag_label)
+            return row
+        return self._make_snippet_row(
+            d["file"], d["content"], d["idx"], d["occurrence"], d["search"],
+            title=d["title"], tag_str=d["tag_str"],
+        )
 
     def _make_note_row(self, file_path, indent=False):
         row = Gtk.ListBoxRow()
@@ -817,6 +816,47 @@ class WhispWindow(Adw.ApplicationWindow):
         row.match_index = None
         row.match_term = ""
         return row
+
+    def _make_snippet_row(self, f, content, idx, occurrence_index, search_text, title=None, tag_str=None):
+        # title/tag_str are only passed for the first match of a note; the rest
+        # are indented snippet-only rows.
+        row = self._make_note_row(f, indent=title is None)
+        vbox = row.get_child()
+        if title is not None:
+            vbox.append(Gtk.Label(label=title, xalign=0))
+            if tag_str:
+                tag_label = Gtk.Label(label=tag_str, xalign=0)
+                tag_label.add_css_class("dim-label")
+                vbox.append(tag_label)
+
+        snippet_label = Gtk.Label(xalign=0)
+        snippet_label.set_markup(self._build_snippet_markup(content, idx, search_text))
+        snippet_label.add_css_class("dim-label")
+        snippet_label.set_ellipsize(Pango.EllipsizeMode.END)
+        snippet_label.set_wrap(False)
+        vbox.append(snippet_label)
+
+        # Navigate by occurrence index, not file offset: the open editor's buffer
+        # can differ from disk (e.g. unsaved Tab indentation), so a raw offset
+        # would mis-select.
+        row.match_index = occurrence_index
+        row.match_term = search_text
+        return row
+
+    def on_search_edge_reached(self, scrolled, pos):
+        # Backstop: if a fast scroll outruns the prefetch and hits the bottom,
+        # render the next page immediately.
+        if pos == Gtk.PositionType.BOTTOM:
+            self._render_next_page()
+
+    def on_search_scrolled(self, vadj):
+        # Prefetch the next page while still a screenful away from the bottom, so
+        # the incremental loading stays invisible to the user.
+        if not self._pending_rows:
+            return
+        remaining_below = vadj.get_upper() - (vadj.get_value() + vadj.get_page_size())
+        if remaining_below < vadj.get_page_size():
+            self._render_next_page()
 
     def on_search_changed(self, entry):
         # Debounce: searching reads every note from disk and rebuilds the whole

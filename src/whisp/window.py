@@ -425,6 +425,26 @@ class WhispWindow(Adw.ApplicationWindow):
         win.present()
 
     def load_notes(self):
+        if config.get("first_run", True):
+            config.set("first_run", False)
+            welcome_file = DATA_DIR / "Welcome to Whisp.md"
+            if not welcome_file.exists():
+                welcome_text = (
+                    "# 👋 Welcome to Whisp!\n\n"
+                    "Whisp is the frictionless anti-note. There are no save buttons or files to manage here.\n\n"
+                    "## Navigation\n"
+                    "👉 **Swipe left and right** on your touchpad (or use `Ctrl+[` and `Ctrl+]`) to switch between notes.\n"
+                    "➕ To create a new note, simply swipe past the last note!\n\n"
+                    "## Features\n"
+                    "☑ **Checklists**: Press `Ctrl+S` on any line to instantly create or toggle a checkbox.\n"
+                    "🔗 **Smart Links**: Paste any long URL, and Whisp will automatically shorten it to keep your notes clean.\n"
+                    "📋 **Plain Paste**: Use `Ctrl+Shift+V` to paste text cleanly without weird formatting.\n"
+                    "🎨 **Themes**: Open Preferences (`Ctrl+,`) to pick a paper background (like Grid or Dotted) and color scheme.\n\n"
+                    "📖 **Manual**: For a full list of features, check out the [User Manual](https://tanaybhomia.github.io/Whisp/manual.html)\n\n"
+                    "🗑️ Press `Ctrl+D` to delete this note when you're done reading it!"
+                )
+                welcome_file.write_text(welcome_text, encoding='utf-8')
+                
         files = sorted(DATA_DIR.glob("*.md"), key=lambda f: os.path.getmtime(f) if f.exists() else 0, reverse=True)
         # Load up to 10 most recently modified notes
         recent_files = files[:10]

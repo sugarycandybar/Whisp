@@ -17,7 +17,8 @@ class Config:
             "paper_theme": "blank",
             "confirm_delete": True,
             "color_scheme": "system",
-            "startup_behavior": "last_note"
+            "startup_behavior": "last_note",
+            "first_run": True
         }
         self.load()
 

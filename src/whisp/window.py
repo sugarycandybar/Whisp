@@ -146,6 +146,64 @@ shortcuts_xml = """
 </interface>
 """
 
+class ChangelogWindow(Adw.Window):
+    def __init__(self, version, changelog_text, parent=None):
+        super().__init__(transient_for=parent, modal=True, title=f"What's New in Whisp")
+        self.set_default_size(400, 480)
+        
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        self.set_content(box)
+        
+        header = Adw.HeaderBar(show_end_title_buttons=False, show_start_title_buttons=False)
+        box.append(header)
+        
+        content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=18)
+        content_box.set_margin_top(18)
+        content_box.set_margin_bottom(24)
+        content_box.set_margin_start(32)
+        content_box.set_margin_end(32)
+        
+        icon = Gtk.Image.new_from_icon_name("io.github.tanaybhomia.Whisp")
+        icon.set_pixel_size(96)
+        icon.set_halign(Gtk.Align.CENTER)
+        content_box.append(icon)
+        
+        title_label = Gtk.Label(label=f"What's New in {version}")
+        title_label.add_css_class("title-1")
+        title_label.set_halign(Gtk.Align.CENTER)
+        content_box.append(title_label)
+        
+        scrolled = Gtk.ScrolledWindow()
+        scrolled.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        scrolled.set_propagate_natural_height(True)
+        scrolled.set_vexpand(True)
+        
+        label = Gtk.Label(label=changelog_text, wrap=True, xalign=0)
+        scrolled.set_child(label)
+        
+        content_box.append(scrolled)
+        
+        btn = Gtk.Button(label="Awesome! Continue")
+        btn.add_css_class("suggested-action")
+        btn.add_css_class("pill")
+        btn.set_halign(Gtk.Align.CENTER)
+        btn.set_size_request(200, -1)
+        btn.set_margin_top(12)
+        btn.connect("clicked", lambda _: self.close())
+        content_box.append(btn)
+        
+        box.append(content_box)
+        
+        key_ctrl = Gtk.EventControllerKey()
+        key_ctrl.connect("key-pressed", self.on_key_pressed)
+        self.add_controller(key_ctrl)
+
+    def on_key_pressed(self, controller, keyval, keycode, state):
+        if keyval == Gdk.KEY_Escape:
+            self.close()
+            return True
+        return False
+
 class WhispWindow(Adw.ApplicationWindow):
     PAGE_SIZE = 20  # result rows rendered per page; more load as the user scrolls
 
@@ -370,7 +428,7 @@ class WhispWindow(Adw.ApplicationWindow):
         else:
             manager.set_color_scheme(Adw.ColorScheme.DEFAULT)
 
-    def _get_dynamic_version(self):
+    def _get_latest_release_info(self):
         import xml.etree.ElementTree as ET
         from pathlib import Path
         try:
@@ -386,10 +444,28 @@ class WhispWindow(Adw.ApplicationWindow):
             if releases is not None:
                 latest_release = releases.find("release")
                 if latest_release is not None:
-                    return latest_release.attrib.get("version", "Unknown")
+                    version = latest_release.attrib.get("version", "Unknown")
+                    
+                    description_text = ""
+                    desc_node = latest_release.find("description")
+                    if desc_node is not None:
+                        for child in desc_node:
+                            if child.tag == "p" and child.text:
+                                description_text += f"{child.text.strip()}\n\n"
+                            elif child.tag == "ul":
+                                for li in child.findall("li"):
+                                    if li.text:
+                                        description_text += f"• {li.text.strip()}\n\n"
+                                description_text += "\n"
+                    
+                    return version, description_text.strip()
         except Exception:
             pass
-        return "Unknown"
+        return "Unknown", ""
+
+    def _get_dynamic_version(self):
+        version, _ = self._get_latest_release_info()
+        return version
 
     def on_about(self, action, param):
         version = self._get_dynamic_version()
@@ -443,7 +519,8 @@ class WhispWindow(Adw.ApplicationWindow):
         win.present()
 
     def load_notes(self):
-        if config.get("first_run", True):
+        is_first_run = config.get("first_run", True)
+        if is_first_run:
             config.set("first_run", False)
             welcome_file = DATA_DIR / "Welcome to Whisp.md"
             if not welcome_file.exists():
@@ -499,6 +576,15 @@ class WhispWindow(Adw.ApplicationWindow):
                 buffer = target_editor.buffer
                 buffer.place_cursor(buffer.get_end_iter())
                 self.update_title()
+                
+                latest_version, changelog_text = self._get_latest_release_info()
+                last_seen = config.get("last_seen_version", "0.0.0")
+                
+                if latest_version != "Unknown" and latest_version != last_seen:
+                    config.set("last_seen_version", latest_version)
+                    if not is_first_run:
+                        ChangelogWindow(latest_version, changelog_text, parent=self).present()
+                        
                 return False
             
             GLib.idle_add(restore_session)

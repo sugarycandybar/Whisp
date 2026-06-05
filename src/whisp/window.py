@@ -178,7 +178,8 @@ class ChangelogWindow(Adw.Window):
         scrolled.set_propagate_natural_height(True)
         scrolled.set_vexpand(True)
         
-        label = Gtk.Label(label=changelog_text, wrap=True, xalign=0)
+        label = Gtk.Label(wrap=True, xalign=0)
+        label.set_markup(changelog_text)
         scrolled.set_child(label)
         
         content_box.append(scrolled)
@@ -438,7 +439,7 @@ class WhispWindow(Adw.ApplicationWindow):
         else:
             manager.set_color_scheme(Adw.ColorScheme.DEFAULT)
 
-    def _get_latest_release_info(self):
+    def _get_latest_release_info(self, last_seen="0.0.0", only_latest=False):
         import xml.etree.ElementTree as ET
         from pathlib import Path
         try:
@@ -451,30 +452,49 @@ class WhispWindow(Adw.ApplicationWindow):
             tree = ET.parse(meta_path)
             root = tree.getroot()
             releases = root.find("releases")
-            if releases is not None:
-                latest_release = releases.find("release")
-                if latest_release is not None:
-                    version = latest_release.attrib.get("version", "Unknown")
+            
+            def parse_ver(v_str):
+                try:
+                    return tuple(map(int, v_str.split('.')))
+                except Exception:
+                    return (0, 0, 0)
                     
-                    description_text = ""
-                    desc_node = latest_release.find("description")
+            last_seen_tuple = parse_ver(last_seen)
+            
+            if releases is not None:
+                description_text = ""
+                latest_version = "Unknown"
+                
+                for i, release in enumerate(releases.findall("release")):
+                    version = release.attrib.get("version", "Unknown")
+                    if i == 0:
+                        latest_version = version
+                        
+                    ver_tuple = parse_ver(version)
+                    if ver_tuple <= last_seen_tuple or (only_latest and i > 0):
+                        break
+                        
+                    # Add a bold subheading for each version update
+                    description_text += f"<span size='large' weight='bold'>v{version}</span>\n"
+                    
+                    desc_node = release.find("description")
                     if desc_node is not None:
                         for child in desc_node:
                             if child.tag == "p" and child.text:
-                                description_text += f"{child.text.strip()}\n\n"
+                                description_text += f"{GLib.markup_escape_text(child.text.strip())}\n\n"
                             elif child.tag == "ul":
                                 for li in child.findall("li"):
                                     if li.text:
-                                        description_text += f"• {li.text.strip()}\n\n"
+                                        description_text += f"• {GLib.markup_escape_text(li.text.strip())}\n\n"
                                 description_text += "\n"
                     
-                    return version, description_text.strip()
+                return latest_version, description_text.strip()
         except Exception:
             pass
         return "Unknown", ""
 
     def _get_dynamic_version(self):
-        version, _ = self._get_latest_release_info()
+        version, _ = self._get_latest_release_info(only_latest=True)
         return version
 
     def on_about(self, action, param):
@@ -631,12 +651,12 @@ class WhispWindow(Adw.ApplicationWindow):
                 buffer.place_cursor(buffer.get_end_iter())
                 self.update_title()
                 
-                latest_version, changelog_text = self._get_latest_release_info()
                 last_seen = config.get("last_seen_version", "0.0.0")
+                latest_version, changelog_text = self._get_latest_release_info(last_seen=last_seen)
                 
                 if latest_version != "Unknown" and latest_version != last_seen:
                     config.set("last_seen_version", latest_version)
-                    if not is_first_run:
+                    if not is_first_run and changelog_text:
                         ChangelogWindow(latest_version, changelog_text, parent=self).present()
                         
                 return False

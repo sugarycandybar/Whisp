@@ -414,6 +414,16 @@ class WhispWindow(Adw.ApplicationWindow):
         self.carousel.connect("page-changed", self.on_page_changed)
         self.box.append(self.carousel)
 
+        # Wheel paging is reimplemented in on_carousel_scroll; touchpad is untouched.
+        self.carousel.set_allow_scroll_wheel(False)
+        self._scroll_last_time = 0.0
+        self._scroll_changes_note = False
+        scroll_ctrl = Gtk.EventControllerScroll()
+        scroll_ctrl.set_flags(Gtk.EventControllerScrollFlags.VERTICAL)
+        scroll_ctrl.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
+        scroll_ctrl.connect("scroll", self.on_carousel_scroll)
+        self.carousel.add_controller(scroll_ctrl)
+
     def on_theme_btn_toggled(self, btn, scheme):
         if btn.get_active():
             config.set("color_scheme", scheme)
@@ -502,6 +512,50 @@ class WhispWindow(Adw.ApplicationWindow):
             editor = self.carousel.get_nth_page(current - 1)
             self.carousel.scroll_to(editor, True)
             GLib.idle_add(lambda: [editor.textview.grab_focus(), False][-1])
+
+    def on_carousel_scroll(self, controller, dx, dy):
+        if controller.get_unit() != Gdk.ScrollUnit.WHEEL or dy == 0:
+            return False
+        editor = self.get_current_editor()
+        if editor is None:
+            return False
+
+        import time
+        now = time.monotonic()
+        # A gap between ticks marks a new scroll motion.
+        new_motion = now - self._scroll_last_time > 0.15
+        self._scroll_last_time = now
+
+        vadj = editor.scrolled.get_vadjustment()
+        direction = 1 if dy > 0 else -1
+        at_top = vadj.get_value() <= vadj.get_lower() + 1
+        at_bottom = vadj.get_value() + vadj.get_page_size() >= vadj.get_upper() - 1
+        at_edge = (direction > 0 and at_bottom) or (direction < 0 and at_top)
+
+        # A motion changes note only if it starts at the edge.
+        if new_motion:
+            self._scroll_changes_note = at_edge
+            if at_edge:
+                self._wheel_change_note(direction)
+        return self._scroll_changes_note
+
+    def _wheel_change_note(self, direction):
+        n_pages = self.carousel.get_n_pages()
+        target = int(round(self.carousel.get_position())) + direction
+        if target < 0 or target >= n_pages:
+            return
+        editor = self.carousel.get_nth_page(target)
+        self.carousel.scroll_to(editor, True)
+
+        # Land on the edge we enter from, so reversing the scroll goes back.
+        def place():
+            vadj = editor.scrolled.get_vadjustment()
+            vadj.set_value(vadj.get_lower() if direction > 0
+                           else vadj.get_upper() - vadj.get_page_size())
+            editor.textview.grab_focus()
+            return False
+        GLib.idle_add(place)
+        GLib.timeout_add(50, place)
 
     def on_wysiwyg_toggled(self, btn):
         config.set("wysiwyg_mode", btn.get_active())

@@ -222,6 +222,10 @@ class WhispWindow(Adw.ApplicationWindow):
         about_action.connect("activate", self.on_about)
         self.add_action(about_action)
 
+        search_action = Gio.SimpleAction.new("search", None)
+        search_action.connect("activate", self.on_search_shortcut)
+        self.add_action(search_action)
+
         # HeaderBar
         self.header_bar = Adw.HeaderBar()
         self.header_bar.add_css_class("flat")
@@ -680,6 +684,9 @@ class WhispWindow(Adw.ApplicationWindow):
         idx = int(round(self.carousel.get_position()))
         idx = max(0, min(idx, n_pages - 1))
         return self.carousel.get_nth_page(idx)
+
+    def on_search_shortcut(self, action, param):
+        self.popover.popup()
 
     def on_popover_visible(self, popover, param):
         if popover.get_visible():

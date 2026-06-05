@@ -31,6 +31,7 @@ class WhispApp(Adw.Application):
         self.set_accels_for_action("win.show-shortcuts", ["<Ctrl>question"])
         self.set_accels_for_action("win.nav-next", ["<Ctrl>bracketright"])
         self.set_accels_for_action("win.nav-prev", ["<Ctrl>bracketleft"])
+        self.set_accels_for_action("win.search", ["<Ctrl>f"])
 
         # Cohesive Background CSS
         css_provider = Gtk.CssProvider()

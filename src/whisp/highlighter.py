@@ -36,7 +36,7 @@ class MarkdownHighlighter:
         self.tag_link = self.buffer.create_tag("link", foreground="#81a1c1", underline=Pango.Underline.SINGLE)
         
         # Monospace / Code
-        self.tag_code = self.buffer.create_tag("code", family="monospace", background="#2a2a2a")
+        self.tag_code = self.buffer.create_tag("code", family="monospace", background="rgba(128, 128, 128, 0.2)")
         
         # Bullet points
         self.tag_bullet = self.buffer.create_tag("bullet", indent=-15, left_margin=30)

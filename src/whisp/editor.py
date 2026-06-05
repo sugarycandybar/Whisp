@@ -30,12 +30,16 @@ class NoteEditor(Gtk.Overlay):
         self.scrolled.set_child(self.textview)
         
         self.buffer = self.textview.get_buffer()
-        self.highlighter = MarkdownHighlighter(self.buffer)
-        
+        self.highlighter = MarkdownHighlighter(self.buffer, self.textview)
+
         self.load_file()
-        
+
         self.buffer.connect("changed", self.on_buffer_changed)
         self.save_timeout_id = 0
+
+        # Re-tag the search highlight for the new viewport as the user scrolls.
+        self.search_scroll_timeout_id = 0
+        self.scrolled.get_vadjustment().connect("value-changed", self.on_editor_scrolled)
         
         # Add keyboard shortcuts (Capture phase for structural locks)
         key_ctrl_capture = Gtk.EventControllerKey()
@@ -536,6 +540,18 @@ class NoteEditor(Gtk.Overlay):
 
     def set_search_highlight(self, term):
         self.highlighter.set_search_term(term)
+
+    def on_editor_scrolled(self, vadj):
+        if not self.highlighter.search_term:
+            return
+        if self.search_scroll_timeout_id:
+            GLib.source_remove(self.search_scroll_timeout_id)
+        self.search_scroll_timeout_id = GLib.timeout_add(30, self._reapply_search_highlight)
+
+    def _reapply_search_highlight(self):
+        self.search_scroll_timeout_id = 0
+        self.highlighter.highlight_search()
+        return False
 
     def scroll_to_match(self, term, occurrence_index):
         # Search the live buffer, not a disk offset (an open editor can diverge).

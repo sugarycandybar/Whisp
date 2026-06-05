@@ -3,8 +3,9 @@ from gi.repository import GLib, Pango
 from whisp.config import config
 
 class MarkdownHighlighter:
-    def __init__(self, buffer):
+    def __init__(self, buffer, textview=None):
         self.buffer = buffer
+        self.textview = textview
         self.search_term = ""
         self.create_tags()
         self.buffer.connect("changed", self.on_changed)
@@ -51,7 +52,40 @@ class MarkdownHighlighter:
 
     def set_search_term(self, term):
         self.search_term = term or ""
-        self.highlight()
+        self.highlight_search()
+
+    def highlight_search(self):
+        start, end = self.buffer.get_bounds()
+        self.buffer.remove_tag(self.tag_search, start, end)
+        if not self.search_term:
+            return
+        # Only tag the visible viewport (plus a margin); the editor re-runs this on
+        # scroll. A common letter can match thousands of times, and tagging every
+        # match across a large document is what made search feel sluggish.
+        lo, hi = self._search_scan_range()
+        base = lo.get_offset()
+        text = self.buffer.get_text(lo, hi, True)
+        for m in re.finditer(re.escape(self.search_term), text, re.IGNORECASE):
+            s_iter = self.buffer.get_iter_at_offset(base + m.start())
+            e_iter = self.buffer.get_iter_at_offset(base + m.end())
+            self.buffer.apply_tag(self.tag_search, s_iter, e_iter)
+
+    def _search_scan_range(self):
+        tv = self.textview
+        if tv is None:
+            return self.buffer.get_bounds()
+        rect = tv.get_visible_rect()
+        if rect.height <= 0:
+            return self.buffer.get_bounds()
+        _, top = tv.get_iter_at_location(0, rect.y)
+        _, bot = tv.get_iter_at_location(0, rect.y + rect.height)
+        for _ in range(40):
+            if not top.backward_line():
+                break
+        for _ in range(40):
+            if not bot.forward_line():
+                break
+        return top, bot
 
     def on_cursor_moved(self, buffer, param):
         cursor_iter = self.buffer.get_iter_at_mark(self.buffer.get_insert())
@@ -198,11 +232,6 @@ class MarkdownHighlighter:
             end_iter = self.buffer.get_iter_at_offset(m.end())
             self.buffer.apply_tag(self.tag_comment, start_iter, end_iter)
 
-        # Re-applied each highlight(), after the remove_all_tags above.
-        if self.search_term:
-            for m in re.finditer(re.escape(self.search_term), text, re.IGNORECASE):
-                s_iter = self.buffer.get_iter_at_offset(m.start())
-                e_iter = self.buffer.get_iter_at_offset(m.end())
-                self.buffer.apply_tag(self.tag_search, s_iter, e_iter)
+        self.highlight_search()
 
         return False

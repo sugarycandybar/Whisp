@@ -5,7 +5,7 @@ from pathlib import Path
 from gi.repository import Gtk, Adw, Gdk, Gio, GLib, Pango
 from whisp.config import config, DATA_DIR, TRASH_DIR
 from whisp.editor import NoteEditor
-from whisp.text_search import body_match_offsets
+from whisp.text_search import iter_body_match_offsets
 
 class ThemeSnippet(Gtk.ToggleButton):
     def __init__(self, theme_id, group=None):
@@ -250,6 +250,9 @@ class WhispWindow(Adw.ApplicationWindow):
         self.header_bar.pack_end(self.search_btn)
 
         self.popover = Gtk.Popover()
+        # Non-modal so the note behind stays scrollable while searching; the
+        # highlight follows the viewport on scroll. Closed via Escape or the button.
+        self.popover.set_autohide(False)
         self.search_btn.set_popover(self.popover)
         self.popover.connect("notify::visible", self.on_popover_visible)
 
@@ -263,7 +266,8 @@ class WhispWindow(Adw.ApplicationWindow):
 
         self.search_entry = Gtk.SearchEntry()
         self.search_timeout_id = 0
-        self._pending_rows = []
+        self._row_iter = None
+        self._note_cache = {}
         self.search_entry.connect("search-changed", self.on_search_changed)
         self.search_entry.connect("stop-search", lambda e: self.popover.popdown())
         popover_box.append(self.search_entry)
@@ -727,6 +731,57 @@ class WhispWindow(Adw.ApplicationWindow):
             + GLib.markup_escape_text(after + suffix)
         )
 
+    def _load_note(self, f):
+        # Parse + lowercase a note once and reuse it until the file changes on disk,
+        # so typing in the search box doesn't reread/relowercase every note per key.
+        try:
+            mtime = os.path.getmtime(f)
+        except OSError:
+            return None
+        cached = self._note_cache.get(f)
+        if cached is not None and cached["mtime"] == mtime:
+            return cached
+        try:
+            content = f.read_text(encoding='utf-8')
+        except OSError:
+            return None
+        first_line = content.split('\n', 1)[0].strip()
+        title = re.sub(r'^#+\s*', '', first_line) if first_line else "New Note"
+        tags = set(re.findall(r'#(\w+)', content))
+        entry = {
+            "mtime": mtime, "content": content, "low_content": content.lower(),
+            "title": title, "tag_str": " ".join(f"#{t}" for t in tags),
+            "blank": not content.strip(),
+        }
+        self._note_cache[f] = entry
+        return entry
+
+    def _iter_row_descriptors(self, files, search_text):
+        # Lazy: descriptors are produced as the page renderer pulls them, so a common
+        # single letter doesn't build thousands of dicts up front for rows never shown.
+        for f in files:
+            entry = self._load_note(f)
+            if entry is None or entry["blank"]:
+                continue
+            title, tag_str, content = entry["title"], entry["tag_str"], entry["content"]
+            if not search_text:
+                yield {"file": f, "plain": True, "title": title, "tag_str": tag_str}
+                continue
+            if search_text not in entry["low_content"]:
+                continue
+            n = 0
+            for idx in iter_body_match_offsets(content, search_text, entry["low_content"]):
+                yield {
+                    "file": f, "content": content, "idx": idx, "occurrence": n,
+                    "search": search_text,
+                    "title": title if n == 0 else None,
+                    "tag_str": tag_str if n == 0 else None,
+                }
+                n += 1
+            if n == 0:
+                # Matched only in the title/tags line; the body has no hit.
+                yield {"file": f, "plain": True, "title": title, "tag_str": tag_str}
+
     def populate_note_list(self, search_text=""):
         # Clear existing rows
         while child := self.note_listbox.get_first_child():
@@ -734,46 +789,20 @@ class WhispWindow(Adw.ApplicationWindow):
 
         search_text = search_text.lower()
         files = sorted(DATA_DIR.glob("*.md"), key=lambda f: os.path.getmtime(f) if f.exists() else 0, reverse=True)
-
-        # Collect all rows but realise widgets a page at a time (building thousands
-        # at once freezes the UI).
-        pending = []
-        for f in files:
-            content = f.read_text(encoding='utf-8') if f.exists() else ""
-            if not content.strip():
-                continue
-            first_line = content.split('\n')[0].strip() if content else ""
-            title = re.sub(r'^#+\s*', '', first_line) if first_line else "New Note"
-
-            tags = set(re.findall(r'#(\w+)', content))
-            tag_str = " ".join(f"#{t}" for t in tags)
-
-            body_matches = []
-            if search_text:
-                searchable = (title + " " + tag_str + " " + content).lower()
-                if search_text not in searchable:
-                    continue
-                body_matches = body_match_offsets(content, search_text)
-
-            if body_matches:
-                for n, idx in enumerate(body_matches):
-                    pending.append({
-                        "file": f, "content": content, "idx": idx, "occurrence": n,
-                        "search": search_text,
-                        "title": title if n == 0 else None,
-                        "tag_str": tag_str if n == 0 else None,
-                    })
-            else:
-                pending.append({"file": f, "plain": True, "title": title, "tag_str": tag_str})
-
-        self._pending_rows = pending
+        # Realise widgets a page at a time; building thousands at once freezes the UI.
+        self._row_iter = self._iter_row_descriptors(files, search_text)
         self._render_next_page()
 
     def _render_next_page(self):
+        if self._row_iter is None:
+            return
         count = 0
-        while self._pending_rows and count < self.PAGE_SIZE:
-            self.note_listbox.append(self._row_from_descriptor(self._pending_rows.pop(0)))
+        for d in self._row_iter:
+            self.note_listbox.append(self._row_from_descriptor(d))
             count += 1
+            if count >= self.PAGE_SIZE:
+                return
+        self._row_iter = None  # exhausted
 
     def _row_from_descriptor(self, d):
         if d.get("plain"):
@@ -837,7 +866,7 @@ class WhispWindow(Adw.ApplicationWindow):
 
     def on_search_scrolled(self, vadj):
         # Prefetch a screenful early so loading stays invisible.
-        if not self._pending_rows:
+        if self._row_iter is None:
             return
         remaining_below = vadj.get_upper() - (vadj.get_value() + vadj.get_page_size())
         if remaining_below < vadj.get_page_size():

@@ -5,6 +5,7 @@ from pathlib import Path
 from gi.repository import Gtk, Adw, Gdk, Gio, GLib, Pango
 from whisp.config import config, DATA_DIR, TRASH_DIR
 from whisp.editor import NoteEditor
+from whisp.text_search import iter_body_match_offsets
 
 class ThemeSnippet(Gtk.ToggleButton):
     def __init__(self, theme_id, group=None):
@@ -146,6 +147,8 @@ shortcuts_xml = """
 """
 
 class WhispWindow(Adw.ApplicationWindow):
+    PAGE_SIZE = 20  # result rows rendered per page; more load as the user scrolls
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         
@@ -219,6 +222,10 @@ class WhispWindow(Adw.ApplicationWindow):
         about_action.connect("activate", self.on_about)
         self.add_action(about_action)
 
+        search_action = Gio.SimpleAction.new("search", None)
+        search_action.connect("activate", self.on_search_shortcut)
+        self.add_action(search_action)
+
         # HeaderBar
         self.header_bar = Adw.HeaderBar()
         self.header_bar.add_css_class("flat")
@@ -243,6 +250,8 @@ class WhispWindow(Adw.ApplicationWindow):
         self.header_bar.pack_end(self.search_btn)
 
         self.popover = Gtk.Popover()
+        # Non-modal so the note stays scrollable while searching; closed via Escape.
+        self.popover.set_autohide(False)
         self.search_btn.set_popover(self.popover)
         self.popover.connect("notify::visible", self.on_popover_visible)
 
@@ -251,16 +260,25 @@ class WhispWindow(Adw.ApplicationWindow):
         popover_box.set_margin_bottom(12)
         popover_box.set_margin_start(12)
         popover_box.set_margin_end(12)
+        popover_box.set_size_request(320, -1)
         self.popover.set_child(popover_box)
 
         self.search_entry = Gtk.SearchEntry()
+        self.search_timeout_id = 0
+        self._row_iter = None
+        self._note_cache = {}
         self.search_entry.connect("search-changed", self.on_search_changed)
+        self.search_entry.connect("stop-search", lambda e: self.popover.popdown())
         popover_box.append(self.search_entry)
 
         scrolled = Gtk.ScrolledWindow()
         scrolled.set_min_content_height(200)
-        scrolled.set_min_content_width(200)
+        scrolled.set_min_content_width(296)
         scrolled.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        self.search_scrolled = scrolled
+        # Infinite scroll: load more on reaching the bottom; prefetch before it.
+        scrolled.connect("edge-reached", self.on_search_edge_reached)
+        scrolled.get_vadjustment().connect("value-changed", self.on_search_scrolled)
         popover_box.append(scrolled)
 
         self.note_listbox = Gtk.ListBox()
@@ -504,6 +522,7 @@ class WhispWindow(Adw.ApplicationWindow):
             GLib.timeout_add(50, grab_it)
             GLib.timeout_add(150, grab_it)
         self.update_line_spacing()
+        return editor
 
     def ensure_empty_note_at_end(self):
         n_pages = self.carousel.get_n_pages()
@@ -643,7 +662,10 @@ class WhispWindow(Adw.ApplicationWindow):
         self.update_title()
         editor = carousel.get_nth_page(int(round(index)))
         if editor:
-            GLib.idle_add(lambda: [editor.textview.grab_focus(), False][-1])
+            if self.popover.get_visible():
+                editor.set_search_highlight(self.search_entry.get_text())
+            else:
+                GLib.idle_add(lambda: [editor.textview.grab_focus(), False][-1])
 
     def on_editor_title_changed(self, editor):
         self.ensure_empty_note_at_end()
@@ -658,69 +680,228 @@ class WhispWindow(Adw.ApplicationWindow):
     def update_title(self):
         pass
 
+    def get_current_editor(self):
+        n_pages = self.carousel.get_n_pages()
+        if n_pages == 0:
+            return None
+        idx = int(round(self.carousel.get_position()))
+        idx = max(0, min(idx, n_pages - 1))
+        return self.carousel.get_nth_page(idx)
+
+    def on_search_shortcut(self, action, param):
+        self.popover.popup()
+
     def on_popover_visible(self, popover, param):
         if popover.get_visible():
             self.search_entry.set_text("")
             self.populate_note_list()
             self.search_entry.grab_focus()
+        else:
+            if self.search_timeout_id:
+                GLib.source_remove(self.search_timeout_id)
+                self.search_timeout_id = 0
+            for i in range(self.carousel.get_n_pages()):
+                self.carousel.get_nth_page(i).set_search_highlight("")
+            editor = self.get_current_editor()
+            if editor:
+                editor.textview.grab_focus()
+
+    def _build_snippet_markup(self, content, idx, search_text):
+        # Asymmetric context: keep the match near the start of the snippet so
+        # the highlight stays visible before the label ellipsizes at the end.
+        pre, post = 12, 60
+        start = max(0, idx - pre)
+        end = min(len(content), idx + len(search_text) + post)
+        match_offset = idx - start
+
+        snippet = content[start:end]
+        before = re.sub(r'\s+', ' ', snippet[:match_offset])
+        matched = re.sub(r'\s+', ' ', snippet[match_offset:match_offset + len(search_text)])
+        after = re.sub(r'\s+', ' ', snippet[match_offset + len(search_text):])
+
+        prefix = "…" if start > 0 else ""
+        suffix = "…" if end < len(content) else ""
+
+        return (
+            GLib.markup_escape_text(prefix + before)
+            + '<span background="#f9f06b" color="#000000">'
+            + GLib.markup_escape_text(matched)
+            + '</span>'
+            + GLib.markup_escape_text(after + suffix)
+        )
+
+    def _load_note(self, f):
+        # Parse + lowercase once per note, reused until its mtime changes.
+        try:
+            mtime = os.path.getmtime(f)
+        except OSError:
+            return None
+        cached = self._note_cache.get(f)
+        if cached is not None and cached["mtime"] == mtime:
+            return cached
+        try:
+            content = f.read_text(encoding='utf-8')
+        except OSError:
+            return None
+        first_line = content.split('\n', 1)[0].strip()
+        title = re.sub(r'^#+\s*', '', first_line) if first_line else "New Note"
+        tags = set(re.findall(r'#(\w+)', content))
+        entry = {
+            "mtime": mtime, "content": content, "low_content": content.lower(),
+            "title": title, "tag_str": " ".join(f"#{t}" for t in tags),
+            "blank": not content.strip(),
+        }
+        self._note_cache[f] = entry
+        return entry
+
+    def _iter_row_descriptors(self, files, search_text):
+        # Lazy: descriptors are pulled by the page renderer, not built up front.
+        for f in files:
+            entry = self._load_note(f)
+            if entry is None or entry["blank"]:
+                continue
+            title, tag_str, content = entry["title"], entry["tag_str"], entry["content"]
+            if not search_text:
+                yield {"file": f, "plain": True, "title": title, "tag_str": tag_str}
+                continue
+            if search_text not in entry["low_content"]:
+                continue
+            n = 0
+            for idx in iter_body_match_offsets(content, search_text, entry["low_content"]):
+                yield {
+                    "file": f, "content": content, "idx": idx, "occurrence": n,
+                    "search": search_text,
+                    "title": title if n == 0 else None,
+                    "tag_str": tag_str if n == 0 else None,
+                }
+                n += 1
+            if n == 0:
+                # Match only in the title/tags line, not the body.
+                yield {"file": f, "plain": True, "title": title, "tag_str": tag_str}
 
     def populate_note_list(self, search_text=""):
         # Clear existing rows
         while child := self.note_listbox.get_first_child():
             self.note_listbox.remove(child)
-            
+
         search_text = search_text.lower()
         files = sorted(DATA_DIR.glob("*.md"), key=lambda f: os.path.getmtime(f) if f.exists() else 0, reverse=True)
-        
-        for f in files:
-            content = f.read_text(encoding='utf-8') if f.exists() else ""
-            first_line = content.split('\n')[0].strip() if content else ""
-            title = re.sub(r'^#+\s*', '', first_line) if first_line else "New Note"
-            
-            tags = set(re.findall(r'#(\w+)', content))
-            tag_str = " ".join([f"#{t}" for t in tags])
-            
-            if search_text:
-                searchable = (title + " " + tag_str).lower()
-                if search_text not in searchable:
-                    continue
-                    
-            row = Gtk.ListBoxRow()
-            vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-            vbox.set_margin_start(12)
-            vbox.set_margin_end(12)
-            vbox.set_margin_top(8)
-            vbox.set_margin_bottom(8)
-            
-            label = Gtk.Label(label=title, xalign=0)
-            vbox.append(label)
-            
-            if tag_str:
-                tag_label = Gtk.Label(label=tag_str, xalign=0)
-                tag_label.add_css_class("dim-label")
-                vbox.append(tag_label)
-                
-            row.set_child(vbox)
-            row.file_path = f
-            self.note_listbox.append(row)
+        # Realise widgets one page at a time to keep the UI responsive.
+        self._row_iter = self._iter_row_descriptors(files, search_text)
+        self._render_next_page()
+
+    def _render_next_page(self):
+        if self._row_iter is None:
+            return
+        count = 0
+        for d in self._row_iter:
+            self.note_listbox.append(self._row_from_descriptor(d))
+            count += 1
+            if count >= self.PAGE_SIZE:
+                return
+        self._row_iter = None  # exhausted
+
+    def _row_from_descriptor(self, d):
+        if d.get("plain"):
+            row = self._make_note_row(d["file"])
+            self._append_header(row.get_child(), d["title"], d["tag_str"])
+            return row
+        return self._make_snippet_row(
+            d["file"], d["content"], d["idx"], d["occurrence"], d["search"],
+            title=d["title"], tag_str=d["tag_str"],
+        )
+
+    def _append_header(self, vbox, title, tag_str):
+        title_label = Gtk.Label(label=title, xalign=0)
+        title_label.set_ellipsize(Pango.EllipsizeMode.END)
+        title_label.set_max_width_chars(32)
+        vbox.append(title_label)
+        if tag_str:
+            tag_label = Gtk.Label(label=tag_str, xalign=0)
+            tag_label.add_css_class("dim-label")
+            tag_label.set_ellipsize(Pango.EllipsizeMode.END)
+            tag_label.set_max_width_chars(32)
+            vbox.append(tag_label)
+
+    def _make_note_row(self, file_path, indent=False):
+        row = Gtk.ListBoxRow()
+        vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        vbox.set_margin_start(28 if indent else 12)
+        vbox.set_margin_end(12)
+        vbox.set_margin_top(8)
+        vbox.set_margin_bottom(8)
+        row.set_child(vbox)
+        row.file_path = file_path
+        row.match_index = None
+        row.match_term = ""
+        return row
+
+    def _make_snippet_row(self, f, content, idx, occurrence_index, search_text, title=None, tag_str=None):
+        # title/tag_str only on a note's first match; the rest are indented.
+        row = self._make_note_row(f, indent=title is None)
+        vbox = row.get_child()
+        if title is not None:
+            self._append_header(vbox, title, tag_str)
+
+        snippet_label = Gtk.Label(xalign=0)
+        snippet_label.set_markup(self._build_snippet_markup(content, idx, search_text))
+        snippet_label.add_css_class("dim-label")
+        snippet_label.set_ellipsize(Pango.EllipsizeMode.END)
+        snippet_label.set_max_width_chars(32)
+        snippet_label.set_wrap(False)
+        vbox.append(snippet_label)
+
+        # Navigate by occurrence index (the buffer can differ from disk).
+        row.match_index = occurrence_index
+        row.match_term = search_text
+        return row
+
+    def on_search_edge_reached(self, scrolled, pos):
+        # Backstop in case a fast scroll outruns the prefetch.
+        if pos == Gtk.PositionType.BOTTOM:
+            self._render_next_page()
+
+    def on_search_scrolled(self, vadj):
+        # Prefetch a screenful early so loading stays invisible.
+        if self._row_iter is None:
+            return
+        remaining_below = vadj.get_upper() - (vadj.get_value() + vadj.get_page_size())
+        if remaining_below < vadj.get_page_size():
+            self._render_next_page()
 
     def on_search_changed(self, entry):
-        self.populate_note_list(entry.get_text())
+        # Debounce: each search rereads every note and rebuilds the list.
+        if self.search_timeout_id:
+            GLib.source_remove(self.search_timeout_id)
+        self.search_timeout_id = GLib.timeout_add(150, self._run_search, entry.get_text())
+
+    def _run_search(self, text):
+        self.search_timeout_id = 0
+        self.populate_note_list(text)
+        editor = self.get_current_editor()
+        if editor:
+            editor.set_search_highlight(text)
+        return False
 
     def on_note_row_activated(self, listbox, row):
         file_path = getattr(row, 'file_path', None)
         if file_path:
             # Check if it's already in the carousel
-            found = False
+            target = None
             for i in range(self.carousel.get_n_pages()):
                 editor = self.carousel.get_nth_page(i)
                 if editor.file_path == file_path:
                     self.carousel.scroll_to(editor, True)
-                    found = True
+                    target = editor
                     break
-            
-            if not found:
-                self.add_note(file_path)
+
+            if target is None:
+                target = self.add_note(file_path)
+
+            match_index = getattr(row, 'match_index', None)
+            if match_index is not None:
+                target.scroll_to_match(getattr(row, 'match_term', ''), match_index)
+
             self.update_title()
         self.popover.popdown()
 

@@ -4,6 +4,7 @@ from pathlib import Path
 from gi.repository import Gtk, GLib, Gdk
 from whisp.config import config, DATA_DIR
 from whisp.highlighter import MarkdownHighlighter
+from whisp.text_search import body_match_offsets
 
 class NoteEditor(Gtk.Overlay):
     def __init__(self, file_path=None, on_title_changed=None):
@@ -29,12 +30,16 @@ class NoteEditor(Gtk.Overlay):
         self.scrolled.set_child(self.textview)
         
         self.buffer = self.textview.get_buffer()
-        self.highlighter = MarkdownHighlighter(self.buffer)
-        
+        self.highlighter = MarkdownHighlighter(self.buffer, self.textview)
+
         self.load_file()
-        
+
         self.buffer.connect("changed", self.on_buffer_changed)
         self.save_timeout_id = 0
+
+        # Re-tag search highlight for the new viewport on scroll.
+        self.search_scroll_timeout_id = 0
+        self.scrolled.get_vadjustment().connect("value-changed", self.on_editor_scrolled)
         
         # Add keyboard shortcuts (Capture phase for structural locks)
         key_ctrl_capture = Gtk.EventControllerKey()
@@ -532,6 +537,43 @@ class NoteEditor(Gtk.Overlay):
             content = self.file_path.read_text(encoding='utf-8')
             self.buffer.set_text(content)
             self.highlighter.highlight()
+
+    def set_search_highlight(self, term):
+        self.highlighter.set_search_term(term)
+
+    def on_editor_scrolled(self, vadj):
+        # Throttle (not debounce) so highlights refresh during a continuous scroll.
+        if not self.highlighter.search_term:
+            return
+        if self.search_scroll_timeout_id:
+            return
+        self.search_scroll_timeout_id = GLib.timeout_add(16, self._reapply_search_highlight)
+
+    def _reapply_search_highlight(self):
+        self.search_scroll_timeout_id = 0
+        self.highlighter.highlight_search()
+        return False
+
+    def scroll_to_match(self, term, occurrence_index):
+        # Search the live buffer, not a disk offset (an open editor can diverge).
+        if not term:
+            return
+        # Defer + retry: a just-inserted editor has no layout to scroll to yet.
+        def do_scroll():
+            start, end = self.buffer.get_bounds()
+            offsets = body_match_offsets(self.buffer.get_text(start, end, True), term)
+            if not offsets:
+                return False
+            offset = offsets[min(occurrence_index, len(offsets) - 1)]
+            s_iter = self.buffer.get_iter_at_offset(offset)
+            e_iter = self.buffer.get_iter_at_offset(offset + len(term))
+            self.buffer.select_range(s_iter, e_iter)
+            self.textview.scroll_to_mark(self.buffer.get_insert(), 0.1, True, 0.0, 0.3)
+            self.textview.grab_focus()
+            return False
+        GLib.idle_add(do_scroll)
+        GLib.timeout_add(80, do_scroll)
+        GLib.timeout_add(180, do_scroll)
 
     def save_file(self):
         self.save_timeout_id = 0

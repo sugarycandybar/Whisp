@@ -3,8 +3,10 @@ from gi.repository import GLib, Pango
 from whisp.config import config
 
 class MarkdownHighlighter:
-    def __init__(self, buffer):
+    def __init__(self, buffer, textview=None):
         self.buffer = buffer
+        self.textview = textview
+        self.search_term = ""
         self.create_tags()
         self.buffer.connect("changed", self.on_changed)
         self.buffer.connect("notify::cursor-position", self.on_cursor_moved)
@@ -45,6 +47,39 @@ class MarkdownHighlighter:
         
         # Invisible tag for WYSIWYG
         self.tag_invisible = self.buffer.create_tag("invisible", invisible=True)
+
+        self.tag_search = self.buffer.create_tag("search_match", background="#f9f06b", foreground="#000000")
+
+    def set_search_term(self, term):
+        self.search_term = term or ""
+        self.highlight_search()
+
+    def highlight_search(self):
+        start, end = self.buffer.get_bounds()
+        self.buffer.remove_tag(self.tag_search, start, end)
+        if not self.search_term:
+            return
+        # Tag only the viewport (+margin); the editor re-runs this on scroll.
+        lo, hi = self._search_scan_range()
+        base = lo.get_offset()
+        text = self.buffer.get_text(lo, hi, True)
+        for m in re.finditer(re.escape(self.search_term), text, re.IGNORECASE):
+            s_iter = self.buffer.get_iter_at_offset(base + m.start())
+            e_iter = self.buffer.get_iter_at_offset(base + m.end())
+            self.buffer.apply_tag(self.tag_search, s_iter, e_iter)
+
+    def _search_scan_range(self):
+        tv = self.textview
+        if tv is None:
+            return self.buffer.get_bounds()
+        rect = tv.get_visible_rect()
+        if rect.height <= 0:
+            return self.buffer.get_bounds()
+        # Two screenfuls of slack each side so fast scroll stays in the band.
+        margin = rect.height * 2
+        _, top = tv.get_iter_at_location(0, max(0, rect.y - margin))
+        _, bot = tv.get_iter_at_location(0, rect.y + rect.height + margin)
+        return top, bot
 
     def on_cursor_moved(self, buffer, param):
         cursor_iter = self.buffer.get_iter_at_mark(self.buffer.get_insert())
@@ -190,5 +225,7 @@ class MarkdownHighlighter:
             start_iter = self.buffer.get_iter_at_offset(m.start())
             end_iter = self.buffer.get_iter_at_offset(m.end())
             self.buffer.apply_tag(self.tag_comment, start_iter, end_iter)
-            
+
+        self.highlight_search()
+
         return False

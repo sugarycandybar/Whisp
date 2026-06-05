@@ -47,6 +47,11 @@
   <content_rating type="oars-1.1" />
 
   <releases>
+    <release version="1.2.1" date="2026-06-04">
+      <description>
+        <p>Added a new Interactive Welcome Note for first-time onboarding to help new users discover powerful shortcuts and features!</p>
+      </description>
+    </release>
     <release version="1.2.0" date="2026-06-04">
       <description>
         <p>Added a new visual Appearance selector and new Paper Themes:</p>

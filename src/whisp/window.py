@@ -254,7 +254,7 @@ class WhispWindow(Adw.ApplicationWindow):
         popover_box.set_margin_bottom(12)
         popover_box.set_margin_start(12)
         popover_box.set_margin_end(12)
-        popover_box.set_size_request(380, -1)
+        popover_box.set_size_request(320, -1)
         self.popover.set_child(popover_box)
 
         self.search_entry = Gtk.SearchEntry()
@@ -266,7 +266,7 @@ class WhispWindow(Adw.ApplicationWindow):
 
         scrolled = Gtk.ScrolledWindow()
         scrolled.set_min_content_height(200)
-        scrolled.set_min_content_width(320)
+        scrolled.set_min_content_width(296)
         scrolled.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
         self.search_scrolled = scrolled
         # Infinite scroll: load more on reaching the bottom; prefetch before it.
@@ -779,10 +779,15 @@ class WhispWindow(Adw.ApplicationWindow):
         )
 
     def _append_header(self, vbox, title, tag_str):
-        vbox.append(Gtk.Label(label=title, xalign=0))
+        title_label = Gtk.Label(label=title, xalign=0)
+        title_label.set_ellipsize(Pango.EllipsizeMode.END)
+        title_label.set_max_width_chars(32)
+        vbox.append(title_label)
         if tag_str:
             tag_label = Gtk.Label(label=tag_str, xalign=0)
             tag_label.add_css_class("dim-label")
+            tag_label.set_ellipsize(Pango.EllipsizeMode.END)
+            tag_label.set_max_width_chars(32)
             vbox.append(tag_label)
 
     def _make_note_row(self, file_path, indent=False):
@@ -809,6 +814,7 @@ class WhispWindow(Adw.ApplicationWindow):
         snippet_label.set_markup(self._build_snippet_markup(content, idx, search_text))
         snippet_label.add_css_class("dim-label")
         snippet_label.set_ellipsize(Pango.EllipsizeMode.END)
+        snippet_label.set_max_width_chars(32)
         snippet_label.set_wrap(False)
         vbox.append(snippet_label)
 

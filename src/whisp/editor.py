@@ -540,9 +540,11 @@ class NoteEditor(Gtk.Overlay):
         self.file_path.write_text(text, encoding='utf-8')
         return False
 
-    def get_title(self):
+    def get_title(self, max_length=50):
         start, end = self.buffer.get_bounds()
         text = self.buffer.get_text(start, end, True)
         first_line = text.split('\n')[0].strip() if text else ""
         first_line = re.sub(r'^#+\s*', '', first_line)
+        if first_line and len(first_line) > max_length:
+            first_line = first_line[:max_length].rstrip() + "…"
         return first_line if first_line else "New Note"

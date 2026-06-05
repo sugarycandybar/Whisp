@@ -18,7 +18,8 @@ class Config:
             "confirm_delete": True,
             "color_scheme": "system",
             "startup_behavior": "last_note",
-            "first_run": True
+            "first_run": True,
+            "last_seen_version": "0.0.0"
         }
         self.load()
 

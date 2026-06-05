@@ -59,9 +59,7 @@ class MarkdownHighlighter:
         self.buffer.remove_tag(self.tag_search, start, end)
         if not self.search_term:
             return
-        # Only tag the visible viewport (plus a margin); the editor re-runs this on
-        # scroll. A common letter can match thousands of times, and tagging every
-        # match across a large document is what made search feel sluggish.
+        # Tag only the viewport (+margin); the editor re-runs this on scroll.
         lo, hi = self._search_scan_range()
         base = lo.get_offset()
         text = self.buffer.get_text(lo, hi, True)
@@ -77,14 +75,10 @@ class MarkdownHighlighter:
         rect = tv.get_visible_rect()
         if rect.height <= 0:
             return self.buffer.get_bounds()
-        _, top = tv.get_iter_at_location(0, rect.y)
-        _, bot = tv.get_iter_at_location(0, rect.y + rect.height)
-        for _ in range(40):
-            if not top.backward_line():
-                break
-        for _ in range(40):
-            if not bot.forward_line():
-                break
+        # Two screenfuls of slack each side so fast scroll stays in the band.
+        margin = rect.height * 2
+        _, top = tv.get_iter_at_location(0, max(0, rect.y - margin))
+        _, bot = tv.get_iter_at_location(0, rect.y + rect.height + margin)
         return top, bot
 
     def on_cursor_moved(self, buffer, param):

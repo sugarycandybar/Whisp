@@ -250,8 +250,7 @@ class WhispWindow(Adw.ApplicationWindow):
         self.header_bar.pack_end(self.search_btn)
 
         self.popover = Gtk.Popover()
-        # Non-modal so the note behind stays scrollable while searching; the
-        # highlight follows the viewport on scroll. Closed via Escape or the button.
+        # Non-modal so the note stays scrollable while searching; closed via Escape.
         self.popover.set_autohide(False)
         self.search_btn.set_popover(self.popover)
         self.popover.connect("notify::visible", self.on_popover_visible)
@@ -732,8 +731,7 @@ class WhispWindow(Adw.ApplicationWindow):
         )
 
     def _load_note(self, f):
-        # Parse + lowercase a note once and reuse it until the file changes on disk,
-        # so typing in the search box doesn't reread/relowercase every note per key.
+        # Parse + lowercase once per note, reused until its mtime changes.
         try:
             mtime = os.path.getmtime(f)
         except OSError:
@@ -757,8 +755,7 @@ class WhispWindow(Adw.ApplicationWindow):
         return entry
 
     def _iter_row_descriptors(self, files, search_text):
-        # Lazy: descriptors are produced as the page renderer pulls them, so a common
-        # single letter doesn't build thousands of dicts up front for rows never shown.
+        # Lazy: descriptors are pulled by the page renderer, not built up front.
         for f in files:
             entry = self._load_note(f)
             if entry is None or entry["blank"]:
@@ -779,7 +776,7 @@ class WhispWindow(Adw.ApplicationWindow):
                 }
                 n += 1
             if n == 0:
-                # Matched only in the title/tags line; the body has no hit.
+                # Match only in the title/tags line, not the body.
                 yield {"file": f, "plain": True, "title": title, "tag_str": tag_str}
 
     def populate_note_list(self, search_text=""):
@@ -789,7 +786,7 @@ class WhispWindow(Adw.ApplicationWindow):
 
         search_text = search_text.lower()
         files = sorted(DATA_DIR.glob("*.md"), key=lambda f: os.path.getmtime(f) if f.exists() else 0, reverse=True)
-        # Realise widgets a page at a time; building thousands at once freezes the UI.
+        # Realise widgets one page at a time to keep the UI responsive.
         self._row_iter = self._iter_row_descriptors(files, search_text)
         self._render_next_page()
 

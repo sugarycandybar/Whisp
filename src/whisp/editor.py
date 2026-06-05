@@ -37,7 +37,7 @@ class NoteEditor(Gtk.Overlay):
         self.buffer.connect("changed", self.on_buffer_changed)
         self.save_timeout_id = 0
 
-        # Re-tag the search highlight for the new viewport as the user scrolls.
+        # Re-tag search highlight for the new viewport on scroll.
         self.search_scroll_timeout_id = 0
         self.scrolled.get_vadjustment().connect("value-changed", self.on_editor_scrolled)
         
@@ -542,11 +542,12 @@ class NoteEditor(Gtk.Overlay):
         self.highlighter.set_search_term(term)
 
     def on_editor_scrolled(self, vadj):
+        # Throttle (not debounce) so highlights refresh during a continuous scroll.
         if not self.highlighter.search_term:
             return
         if self.search_scroll_timeout_id:
-            GLib.source_remove(self.search_scroll_timeout_id)
-        self.search_scroll_timeout_id = GLib.timeout_add(30, self._reapply_search_highlight)
+            return
+        self.search_scroll_timeout_id = GLib.timeout_add(16, self._reapply_search_highlight)
 
     def _reapply_search_highlight(self):
         self.search_scroll_timeout_id = 0

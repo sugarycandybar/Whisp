@@ -42,9 +42,8 @@ Here are the features we are planning to add, ordered by priority:
 - [ ] **Image to text**
 - [ ] **Themes**
   - [ ] Adding normal themes like gruvbox to variables
-  - [ ] Large Grid
-  - [ ] Lines
-- [ ] **Search**
+  - [x] Large Grid
+- [x] **Search**
 - [ ] **Find and Replace**
 - [ ] **Generate Random numbers**
 - [ ] **Roll Dice**

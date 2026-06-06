@@ -615,8 +615,23 @@ class WhispWindow(Adw.ApplicationWindow):
                 welcome_file.write_text(welcome_text, encoding='utf-8')
                 
         files = sorted(DATA_DIR.glob("*.md"), key=lambda f: os.path.getmtime(f) if f.exists() else 0, reverse=True)
-        # Load up to 10 most recently modified notes
-        recent_files = files[:10]
+        
+        archive_days = config.get("archive_days", 0)
+        import time
+        now = time.time()
+        
+        active_files = []
+        for f in files:
+            if not f.exists():
+                continue
+            if archive_days > 0:
+                age_days = (now - os.path.getmtime(f)) / (24 * 3600)
+                if age_days > archive_days:
+                    continue
+            active_files.append(f)
+            
+        # Load up to 10 most recently modified active notes
+        recent_files = active_files[:10]
         
         if not recent_files:
             self.add_note(grab_focus=False)
@@ -1152,6 +1167,28 @@ class WhispWindow(Adw.ApplicationWindow):
         startup_row.add_suffix(startup_dropdown)
         behavior_group.add(startup_row)
 
+        archive_row = Adw.ActionRow(
+            title="Auto-Archive Inactive Notes",
+            subtitle="Notes are not deleted. They are simply hidden from the app to reduce clutter, but remain fully searchable via Ctrl+F.",
+        )
+        archive_model = Gtk.StringList.new(["Never", "1 Week", "1 Month", "1 Year"])
+        archive_dropdown = Gtk.DropDown(model=archive_model)
+        archive_dropdown.set_valign(Gtk.Align.CENTER)
+        
+        current_archive = config.get("archive_days", 0)
+        idx = 0
+        if current_archive == 7:
+            idx = 1
+        elif current_archive == 30:
+            idx = 2
+        elif current_archive == 365:
+            idx = 3
+            
+        archive_dropdown.set_selected(idx)
+        archive_dropdown.connect("notify::selected-item", self.on_archive_days_changed)
+        archive_row.add_suffix(archive_dropdown)
+        behavior_group.add(archive_row)
+
         confirm_row = Adw.ActionRow(
             title="Confirm Before Deleting",
             subtitle="Ask for confirmation when deleting a note",
@@ -1215,6 +1252,12 @@ class WhispWindow(Adw.ApplicationWindow):
         selected = dropdown.get_selected()
         val = "empty_note" if selected == 1 else "last_note"
         config.set("startup_behavior", val)
+
+    def on_archive_days_changed(self, dropdown, param):
+        selected = dropdown.get_selected()
+        days_map = {0: 0, 1: 7, 2: 30, 3: 365}
+        days = days_map.get(selected, 0)
+        config.set("archive_days", days)
 
     def update_line_spacing(self):
         spacing_str = config.get("line_spacing", "1.2")

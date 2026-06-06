@@ -10,6 +10,8 @@
   <a href="#"><img src="https://img.shields.io/badge/Platform-GNOME-4A86CF?style=flat-square" alt="Platform: GNOME"></a>
   <a href="#"><img src="https://img.shields.io/badge/GTK-4.0-white?style=flat-square&logo=gtk" alt="GTK4"></a>
   <a href="#"><img src="https://img.shields.io/badge/License-GPLv3-blue?style=flat-square" alt="License: GPLv3"></a>
+  <a href="https://github.com/tanaybhomia/Whisp/stargazers"><img src="https://img.shields.io/github/stars/tanaybhomia/Whisp?style=flat-square&logo=github&color=gold" alt="GitHub Stars"></a>
+  <a href="https://flathub.org/apps/io.github.tanaybhomia.Whisp"><img src="https://img.shields.io/flathub/downloads/io.github.tanaybhomia.Whisp?style=flat-square&logo=flathub&color=blue" alt="Flathub Downloads"></a>
   <br><br>
 </div>
 
@@ -19,6 +21,13 @@
 
 
 Whisp is a minimalist, lightning-fast note-taking application built strictly for the GNOME desktop environment. It abandons traditional complex file hierarchies in favor of a spatial, swipeable canvas. Inspired by the "anti-note" philosophy, it is designed to act as a seamless desktop scratchpad offering distraction-free Markdown editing while blending perfectly with modern GNOME aesthetics using GTK4 and Libadwaita.
+
+## Why Whisp?
+
+Most note-taking apps force you into a heavy workflow of creating files, managing folders, and hitting "Save". **Whisp is different.**
+- **Zero Friction**: There are no titles to type, no files to name, and no folders to manage. Just open the app and start typing. 
+- **Swipeable Canvas**: Instead of a sidebar of files, your notes exist in a spatial, horizontal carousel. A quick trackpad swipe instantly glides you to your next thought.
+- **The "Anti-Note"**: Use it as a scratchpad. Jot down quick thoughts, paste temporary links, and when you're done, hit `Ctrl+D` to delete it forever and keep your desk clean.
 
 ## Core Features
 

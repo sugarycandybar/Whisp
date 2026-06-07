@@ -71,6 +71,12 @@ shortcuts_xml = """
             <property name="accelerator">&lt;Primary&gt;comma</property>
           </object>
         </child>
+        <child>
+          <object class="AdwShortcutsItem">
+            <property name="title">Quit</property>
+            <property name="accelerator">&lt;Primary&gt;q</property>
+          </object>
+        </child>
       </object>
     </child>
     
@@ -255,6 +261,10 @@ class WhispWindow(Adw.ApplicationWindow):
         pref_action = Gio.SimpleAction.new("preferences", None)
         pref_action.connect("activate", self.on_preferences)
         self.add_action(pref_action)
+
+        quit_action = Gio.SimpleAction.new("quit", None)
+        quit_action.connect("activate", lambda *_: self.close())
+        self.add_action(quit_action)
         
         nav_next_action = Gio.SimpleAction.new("nav-next", None)
         nav_next_action.connect("activate", self.on_nav_next)

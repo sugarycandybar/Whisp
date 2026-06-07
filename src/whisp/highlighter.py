@@ -216,9 +216,26 @@ class MarkdownHighlighter:
 
         # Apply code (`text`)
         for m in re.finditer(r'(`)(.*?)(`)', text):
-            start_iter = self.buffer.get_iter_at_offset(m.start())
-            end_iter = self.buffer.get_iter_at_offset(m.end())
-            self.buffer.apply_tag(self.tag_code, start_iter, end_iter)
+            if wysiwyg and not (m.start() <= cursor_offset <= m.end()):
+                # Hide opening backtick
+                start_iter = self.buffer.get_iter_at_offset(m.start(1))
+                end_iter = self.buffer.get_iter_at_offset(m.end(1))
+                self.buffer.apply_tag(self.tag_invisible, start_iter, end_iter)
+                
+                # Hide closing backtick
+                start_iter = self.buffer.get_iter_at_offset(m.start(3))
+                end_iter = self.buffer.get_iter_at_offset(m.end(3))
+                self.buffer.apply_tag(self.tag_invisible, start_iter, end_iter)
+
+                # Apply code styling to inner text only
+                start_iter = self.buffer.get_iter_at_offset(m.start(2))
+                end_iter = self.buffer.get_iter_at_offset(m.end(2))
+                self.buffer.apply_tag(self.tag_code, start_iter, end_iter)
+            else:
+                # Apply code styling to the whole match including backticks
+                start_iter = self.buffer.get_iter_at_offset(m.start())
+                end_iter = self.buffer.get_iter_at_offset(m.end())
+                self.buffer.apply_tag(self.tag_code, start_iter, end_iter)
             
         # Apply comments (// text)
         for m in re.finditer(r'^(\s*(?:[☐☑]\s*)?//)(.*)$', text, re.MULTILINE):

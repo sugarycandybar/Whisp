@@ -31,113 +31,104 @@ class ThemeSnippet(Gtk.ToggleButton):
 
 shortcuts_xml = """
 <interface>
-  <object class="GtkShortcutsWindow" id="shortcuts_window">
-    <property name="modal">True</property>
+  <object class="AdwShortcutsDialog" id="shortcuts_dialog">
     <child>
-      <object class="GtkShortcutsSection">
-        <property name="section-name">editor</property>
-        <property name="max-height">12</property>
-        
+      <object class="AdwShortcutsSection">
+        <property name="title">General</property>
         <child>
-          <object class="GtkShortcutsGroup">
-            <property name="title">General</property>
-            <child>
-              <object class="GtkShortcutsShortcut">
-                <property name="title">Create New Note</property>
-                <property name="accelerator">&lt;Primary&gt;n</property>
-              </object>
-            </child>
-            <child>
-              <object class="GtkShortcutsShortcut">
-                <property name="title">Delete Note</property>
-                <property name="accelerator">&lt;Primary&gt;Delete</property>
-              </object>
-            </child>
-            <child>
-              <object class="GtkShortcutsShortcut">
-                <property name="title">Undo Delete</property>
-                <property name="accelerator">&lt;Primary&gt;&lt;Shift&gt;t</property>
-              </object>
-            </child>
-            <child>
-              <object class="GtkShortcutsShortcut">
-                <property name="title">Previous Note</property>
-                <property name="accelerator">&lt;Primary&gt;bracketleft</property>
-              </object>
-            </child>
-            <child>
-              <object class="GtkShortcutsShortcut">
-                <property name="title">Next Note</property>
-                <property name="accelerator">&lt;Primary&gt;bracketright</property>
-              </object>
-            </child>
-            <child>
-              <object class="GtkShortcutsShortcut">
-                <property name="title">Preferences</property>
-                <property name="accelerator">&lt;Primary&gt;comma</property>
-              </object>
-            </child>
+          <object class="AdwShortcutsItem">
+            <property name="title">Create New Note</property>
+            <property name="accelerator">&lt;Primary&gt;n</property>
           </object>
         </child>
-        
         <child>
-          <object class="GtkShortcutsGroup">
-            <property name="title">Editor</property>
-            <child>
-              <object class="GtkShortcutsShortcut">
-                <property name="title">Search Notes</property>
-                <property name="accelerator">&lt;Primary&gt;f</property>
-              </object>
-            </child>
-            <child>
-              <object class="GtkShortcutsShortcut">
-                <property name="title">Toggle Checkbox</property>
-                <property name="accelerator">&lt;Primary&gt;s</property>
-              </object>
-            </child>
-            <child>
-              <object class="GtkShortcutsShortcut">
-                <property name="title">Paste Plain Text</property>
-                <property name="accelerator">&lt;Primary&gt;&lt;Shift&gt;v</property>
-              </object>
-            </child>
-            <child>
-              <object class="GtkShortcutsShortcut">
-                <property name="title">Shorten Selected URL</property>
-                <property name="accelerator">&lt;Primary&gt;&lt;Shift&gt;l</property>
-              </object>
-            </child>
-            <child>
-              <object class="GtkShortcutsShortcut">
-                <property name="title">Bold Text</property>
-
-                <property name="accelerator">&lt;Primary&gt;b</property>
-              </object>
-            </child>
-            <child>
-              <object class="GtkShortcutsShortcut">
-                <property name="title">Italic Text</property>
-                <property name="accelerator">&lt;Primary&gt;i</property>
-              </object>
-            </child>
-            <child>
-              <object class="GtkShortcutsShortcut">
-                <property name="title">Underline Text</property>
-                <property name="accelerator">&lt;Primary&gt;u</property>
-              </object>
-            </child>
+          <object class="AdwShortcutsItem">
+            <property name="title">Delete Note</property>
+            <property name="accelerator">&lt;Primary&gt;Delete</property>
           </object>
         </child>
-
         <child>
-          <object class="GtkShortcutsGroup">
-            <property name="title">Modes</property>
-            <child>
-              <object class="GtkShortcutsShortcut">
-                <property name="title">Toggle WYSIWYG Mode</property>
-                <property name="accelerator">&lt;Primary&gt;e</property>
-              </object>
-            </child>
+          <object class="AdwShortcutsItem">
+            <property name="title">Undo Delete</property>
+            <property name="accelerator">&lt;Primary&gt;&lt;Shift&gt;t</property>
+          </object>
+        </child>
+        <child>
+          <object class="AdwShortcutsItem">
+            <property name="title">Previous Note</property>
+            <property name="accelerator">&lt;Primary&gt;bracketleft</property>
+          </object>
+        </child>
+        <child>
+          <object class="AdwShortcutsItem">
+            <property name="title">Next Note</property>
+            <property name="accelerator">&lt;Primary&gt;bracketright</property>
+          </object>
+        </child>
+        <child>
+          <object class="AdwShortcutsItem">
+            <property name="title">Preferences</property>
+            <property name="accelerator">&lt;Primary&gt;comma</property>
+          </object>
+        </child>
+      </object>
+    </child>
+    
+    <child>
+      <object class="AdwShortcutsSection">
+        <property name="title">Editor</property>
+        <child>
+          <object class="AdwShortcutsItem">
+            <property name="title">Search Notes</property>
+            <property name="accelerator">&lt;Primary&gt;f</property>
+          </object>
+        </child>
+        <child>
+          <object class="AdwShortcutsItem">
+            <property name="title">Toggle Checkbox</property>
+            <property name="accelerator">&lt;Primary&gt;s</property>
+          </object>
+        </child>
+        <child>
+          <object class="AdwShortcutsItem">
+            <property name="title">Paste Plain Text</property>
+            <property name="accelerator">&lt;Primary&gt;&lt;Shift&gt;v</property>
+          </object>
+        </child>
+        <child>
+          <object class="AdwShortcutsItem">
+            <property name="title">Shorten Selected URL</property>
+            <property name="accelerator">&lt;Primary&gt;&lt;Shift&gt;l</property>
+          </object>
+        </child>
+        <child>
+          <object class="AdwShortcutsItem">
+            <property name="title">Bold Text</property>
+            <property name="accelerator">&lt;Primary&gt;b</property>
+          </object>
+        </child>
+        <child>
+          <object class="AdwShortcutsItem">
+            <property name="title">Italic Text</property>
+            <property name="accelerator">&lt;Primary&gt;i</property>
+          </object>
+        </child>
+        <child>
+          <object class="AdwShortcutsItem">
+            <property name="title">Underline Text</property>
+            <property name="accelerator">&lt;Primary&gt;u</property>
+          </object>
+        </child>
+      </object>
+    </child>
+
+    <child>
+      <object class="AdwShortcutsSection">
+        <property name="title">Modes</property>
+        <child>
+          <object class="AdwShortcutsItem">
+            <property name="title">Toggle WYSIWYG Mode</property>
+            <property name="accelerator">&lt;Primary&gt;e</property>
           </object>
         </child>
       </object>
@@ -499,7 +490,7 @@ class WhispWindow(Adw.ApplicationWindow):
 
     def on_about(self, action, param):
         version = self._get_dynamic_version()
-        about = Adw.AboutWindow(
+        about = Adw.AboutDialog(
             application_name="Whisp",
             application_icon="io.github.tanaybhomia.Whisp",
             developer_name="Tanay Bhomia",
@@ -509,9 +500,7 @@ class WhispWindow(Adw.ApplicationWindow):
             issue_url="https://github.com/tanaybhomia/Whisp/issues",
             license_type=Gtk.License.GPL_3_0
         )
-        about.set_default_size(360, -1)
-        about.set_transient_for(self)
-        about.present()
+        about.present(self)
 
     def on_nav_next(self, action=None, param=None):
         n_pages = self.carousel.get_n_pages()
@@ -588,9 +577,8 @@ class WhispWindow(Adw.ApplicationWindow):
 
     def on_show_shortcuts(self, action, param):
         builder = Gtk.Builder.new_from_string(shortcuts_xml, -1)
-        win = builder.get_object("shortcuts_window")
-        win.set_transient_for(self)
-        win.present()
+        dialog = builder.get_object("shortcuts_dialog")
+        dialog.present(self)
 
     def load_notes(self):
         is_first_run = config.get("first_run", True)
@@ -764,8 +752,7 @@ class WhispWindow(Adw.ApplicationWindow):
             return
 
         title = editor.get_title()
-        dialog = Adw.MessageDialog(
-            transient_for=self,
+        dialog = Adw.AlertDialog(
             heading="Delete Note?",
             body=f"“{title}” will be moved to the trash. You can undo this with Ctrl+Shift+T.",
         )
@@ -775,7 +762,7 @@ class WhispWindow(Adw.ApplicationWindow):
         dialog.set_default_response("cancel")
         dialog.set_close_response("cancel")
         dialog.connect("response", self.on_delete_dialog_response, editor)
-        dialog.present()
+        dialog.present(self)
 
     def on_delete_dialog_response(self, dialog, response, editor):
         if response == "delete":
@@ -1085,7 +1072,7 @@ class WhispWindow(Adw.ApplicationWindow):
         self.popover.popdown()
 
     def on_preferences(self, action, param):
-        pref_window = Adw.PreferencesWindow(transient_for=self)
+        pref_window = Adw.PreferencesDialog()
         
         # --- Appearance Page ---
         appearance_page = Adw.PreferencesPage(title="Appearance", icon_name="preferences-desktop-appearance-symbolic")
@@ -1253,7 +1240,7 @@ class WhispWindow(Adw.ApplicationWindow):
         storage_page.add(storage_group)
         
         pref_window.add(storage_page)
-        pref_window.present()
+        pref_window.present(self)
 
     def on_font_changed(self, font_btn, param):
         desc = font_btn.get_font_desc()

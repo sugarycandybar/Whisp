@@ -630,8 +630,12 @@ class WhispWindow(Adw.ApplicationWindow):
                     continue
             active_files.append(f)
             
-        # Load up to 10 most recently modified active notes
-        recent_files = active_files[:10]
+        # Load up to N most recently modified active notes
+        max_notes = config.get("max_carousel_size", 10)
+        if max_notes > 0:
+            recent_files = active_files[:max_notes]
+        else:
+            recent_files = active_files
         
         if not recent_files:
             self.add_note(grab_focus=False)
@@ -1189,6 +1193,28 @@ class WhispWindow(Adw.ApplicationWindow):
         archive_row.add_suffix(archive_dropdown)
         behavior_group.add(archive_row)
 
+        carousel_size_row = Adw.ActionRow(
+            title="Max Carousel Size",
+            subtitle="Limit the number of notes loaded into the swipable carousel. Older notes remain fully searchable.",
+        )
+        carousel_size_model = Gtk.StringList.new(["10 Notes", "25 Notes", "50 Notes", "Unlimited"])
+        carousel_size_dropdown = Gtk.DropDown(model=carousel_size_model)
+        carousel_size_dropdown.set_valign(Gtk.Align.CENTER)
+        
+        current_size = config.get("max_carousel_size", 10)
+        idx = 0
+        if current_size == 25:
+            idx = 1
+        elif current_size == 50:
+            idx = 2
+        elif current_size == 0:
+            idx = 3
+            
+        carousel_size_dropdown.set_selected(idx)
+        carousel_size_dropdown.connect("notify::selected-item", self.on_carousel_size_changed)
+        carousel_size_row.add_suffix(carousel_size_dropdown)
+        behavior_group.add(carousel_size_row)
+
         confirm_row = Adw.ActionRow(
             title="Confirm Before Deleting",
             subtitle="Ask for confirmation when deleting a note",
@@ -1254,10 +1280,16 @@ class WhispWindow(Adw.ApplicationWindow):
         config.set("startup_behavior", val)
 
     def on_archive_days_changed(self, dropdown, param):
-        selected = dropdown.get_selected()
-        days_map = {0: 0, 1: 7, 2: 30, 3: 365}
-        days = days_map.get(selected, 0)
+        idx = dropdown.get_selected()
+        day_map = {0: 0, 1: 7, 2: 30, 3: 365}
+        days = day_map.get(idx, 0)
         config.set("archive_days", days)
+
+    def on_carousel_size_changed(self, dropdown, param):
+        idx = dropdown.get_selected()
+        size_map = {0: 10, 1: 25, 2: 50, 3: 0}
+        size = size_map.get(idx, 10)
+        config.set("max_carousel_size", size)
 
     def update_line_spacing(self):
         spacing_str = config.get("line_spacing", "1.2")

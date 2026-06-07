@@ -237,9 +237,9 @@ class WhispWindow(Adw.ApplicationWindow):
         
         DATA_DIR.mkdir(parents=True, exist_ok=True)
 
-        self.box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        self.toolbar_view = Adw.ToolbarView()
         self.toast_overlay = Adw.ToastOverlay()
-        self.toast_overlay.set_child(self.box)
+        self.toast_overlay.set_child(self.toolbar_view)
         self.set_content(self.toast_overlay)
         
         self.last_deleted_file = None
@@ -288,7 +288,7 @@ class WhispWindow(Adw.ApplicationWindow):
         # HeaderBar
         self.header_bar = Adw.HeaderBar()
         self.header_bar.add_css_class("flat")
-        self.box.append(self.header_bar)
+        self.toolbar_view.add_top_bar(self.header_bar)
         
         # WYSIWYG Toggle Button
         self.wysiwyg_btn = Gtk.ToggleButton(icon_name="view-reveal-symbolic")
@@ -413,7 +413,7 @@ class WhispWindow(Adw.ApplicationWindow):
         self.carousel.set_spacing(16)
         self.carousel.set_interactive(True)
         self.carousel.connect("page-changed", self.on_page_changed)
-        self.box.append(self.carousel)
+        self.toolbar_view.set_content(self.carousel)
 
         # Wheel paging is reimplemented in on_carousel_scroll; touchpad is untouched.
         self.carousel.set_allow_scroll_wheel(False)

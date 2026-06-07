@@ -1086,10 +1086,12 @@ class WhispWindow(Adw.ApplicationWindow):
 
     def on_preferences(self, action, param):
         pref_window = Adw.PreferencesWindow(transient_for=self)
-        page = Adw.PreferencesPage()
+        
+        # --- Appearance Page ---
+        appearance_page = Adw.PreferencesPage(title="Appearance", icon_name="preferences-desktop-appearance-symbolic")
         
         # Appearance Group
-        font_group = Adw.PreferencesGroup(title="Appearance")
+        font_group = Adw.PreferencesGroup(title="Text")
         font_row = Adw.ActionRow(title="Editor Font")
         
         font_dialog = Gtk.FontDialog()
@@ -1134,7 +1136,7 @@ class WhispWindow(Adw.ApplicationWindow):
             flowbox.append(snippet)
             
         theme_group.add(flowbox)
-        page.add(theme_group)
+        appearance_page.add(theme_group)
         
         # Line Spacing
         spacing_row = Adw.ActionRow(title="Line Spacing")
@@ -1153,10 +1155,14 @@ class WhispWindow(Adw.ApplicationWindow):
         spacing_row.add_suffix(spacing_dropdown)
         font_group.add(spacing_row)
         
-        page.add(font_group)
+        appearance_page.add(font_group)
+        pref_window.add(appearance_page)
+
+        # --- Behavior Page ---
+        behavior_page = Adw.PreferencesPage(title="Behavior", icon_name="preferences-system-symbolic")
 
         # Behavior Group
-        behavior_group = Adw.PreferencesGroup(title="Behavior")
+        behavior_group = Adw.PreferencesGroup(title="Workflow")
         
         startup_row = Adw.ActionRow(title="Startup Behavior")
         startup_model = Gtk.StringList.new(["Restore last active note", "Start with empty note"])
@@ -1227,10 +1233,14 @@ class WhispWindow(Adw.ApplicationWindow):
         confirm_row.set_activatable_widget(confirm_switch)
         behavior_group.add(confirm_row)
 
-        page.add(behavior_group)
+        behavior_page.add(behavior_group)
+        pref_window.add(behavior_page)
+
+        # --- Storage Page ---
+        storage_page = Adw.PreferencesPage(title="Storage", icon_name="drive-harddisk-symbolic")
 
         # Storage Group
-        group = Adw.PreferencesGroup(title="Storage")
+        storage_group = Adw.PreferencesGroup(title="Data Location")
         
         row = Adw.ActionRow(title="Notes Directory", subtitle=str(DATA_DIR))
         
@@ -1239,10 +1249,10 @@ class WhispWindow(Adw.ApplicationWindow):
         btn.connect("clicked", self.on_change_dir, row)
         row.add_suffix(btn)
         
-        group.add(row)
-        page.add(group)
+        storage_group.add(row)
+        storage_page.add(storage_group)
         
-        pref_window.add(page)
+        pref_window.add(storage_page)
         pref_window.present()
 
     def on_font_changed(self, font_btn, param):

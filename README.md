@@ -5,7 +5,7 @@
   <p><b>The Anti-Note for GNOME. A fluid, gesture-driven scratchpad designed for speed.</b></p>
 
   <a href="https://flathub.org/apps/io.github.tanaybhomia.Whisp">
-    <img src="https://flathub.org/assets/badges/flathub-badge-en.png" alt="Download on Flathub" height="50">
+    <img src="https://flathub.org/api/badge?svg&locale=en" alt="Download on Flathub" height="50">
   </a>
   <br><br>
   

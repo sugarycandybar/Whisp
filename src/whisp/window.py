@@ -314,9 +314,9 @@ class WhispWindow(Adw.ApplicationWindow):
         self.header_bar.pack_start(del_btn)
 
         # Pin Note Button
-        self.pin_btn = Gtk.ToggleButton(icon_name="window-pin-symbolic")
+        self.pin_btn = Gtk.ToggleButton(icon_name="view-pin-symbolic")
         self.pin_btn.set_tooltip_text("Pin Note")
-        self.pin_btn.connect("toggled", self.on_pin_toggled)
+        self.pin_btn.connect("toggled", self.on_pin_note_toggled)
         self.header_bar.pack_start(self.pin_btn)
 
         # Search Toggle Button
@@ -610,50 +610,71 @@ class WhispWindow(Adw.ApplicationWindow):
         meta_file = DATA_DIR / "metadata.json"
         meta_file.write_text(json.dumps(self.metadata))
 
-    def on_pin_toggled(self, btn):
+    def on_pin_note_toggled(self, btn):
         if self._ignore_pin_toggle:
             return
             
-        current_page_idx = int(round(self.carousel.get_position()))
-        if current_page_idx < 0 or current_page_idx >= self.carousel.get_n_pages():
-            return
-            
-        current_page = self.carousel.get_nth_page(current_page_idx)
-        if not current_page:
-            return
-            
-        is_pinned = btn.get_active()
-        fname = current_page.file_path.name
-        
-        if fname not in self.metadata:
-            self.metadata[fname] = {}
-        self.metadata[fname]["pinned"] = is_pinned
-        self.save_metadata()
-        
-        if is_pinned:
-            self.carousel.reorder(current_page, 0)
-            self.carousel.scroll_to(current_page, True)
-            GLib.idle_add(lambda: [current_page.textview.grab_focus(), False][-1])
-        else:
-            target_pos = 0
-            current_mtime = os.path.getmtime(current_page.file_path) if current_page.file_path.exists() else 0
-            n_pages = self.carousel.get_n_pages()
-            for i in range(n_pages - 1): # Ignore empty note at end
-                p = self.carousel.get_nth_page(i)
-                if p == current_page:
-                    continue
-                p_pinned = self.metadata.get(p.file_path.name, {}).get("pinned", False)
-                if p_pinned:
-                    target_pos = i + 1
-                    continue
-                p_mtime = os.path.getmtime(p.file_path) if p.file_path.exists() else 0
-                if current_mtime < p_mtime:
-                    break
-                target_pos = i + 1
+        try:
+            current_page_idx = int(round(self.carousel.get_position()))
+            if current_page_idx < 0 or current_page_idx >= self.carousel.get_n_pages():
+                return
                 
-            self.carousel.reorder(current_page, target_pos)
-            self.carousel.scroll_to(current_page, True)
-            GLib.idle_add(lambda: [current_page.textview.grab_focus(), False][-1])
+            current_page = self.carousel.get_nth_page(current_page_idx)
+            if not current_page:
+                return
+                
+            is_pinned = btn.get_active()
+            fname = current_page.file_path.name
+            
+            if fname not in self.metadata:
+                self.metadata[fname] = {}
+            self.metadata[fname]["pinned"] = is_pinned
+            self.save_metadata()
+            
+            if is_pinned:
+                self.carousel.remove(current_page)
+                self.carousel.insert(current_page, 0)
+                
+                def animate_pin():
+                    self.carousel.scroll_to(current_page, True)
+                    current_page.textview.grab_focus()
+                    return False
+                
+                GLib.idle_add(animate_pin)
+                GLib.timeout_add(50, animate_pin)
+                
+                self.toast_overlay.add_toast(Adw.Toast.new("Note Pinned to front"))
+            else:
+                target_pos = 0
+                current_mtime = os.path.getmtime(current_page.file_path) if current_page.file_path.exists() else 0
+                n_pages = self.carousel.get_n_pages()
+                for i in range(n_pages - 1): # Ignore empty note at end
+                    p = self.carousel.get_nth_page(i)
+                    if p == current_page:
+                        continue
+                    p_pinned = self.metadata.get(p.file_path.name, {}).get("pinned", False)
+                    if p_pinned:
+                        target_pos = i + 1
+                        continue
+                    p_mtime = os.path.getmtime(p.file_path) if p.file_path.exists() else 0
+                    if current_mtime < p_mtime:
+                        break
+                    target_pos = i + 1
+                    
+                self.carousel.remove(current_page)
+                self.carousel.insert(current_page, target_pos)
+                
+                def animate_unpin():
+                    self.carousel.scroll_to(current_page, True)
+                    current_page.textview.grab_focus()
+                    return False
+                
+                GLib.idle_add(animate_unpin)
+                GLib.timeout_add(50, animate_unpin)
+                
+                self.toast_overlay.add_toast(Adw.Toast.new("Note Unpinned"))
+        except Exception as e:
+            self.toast_overlay.add_toast(Adw.Toast.new(f"Error: {str(e)}"))
 
     def load_notes(self):
         is_first_run = config.get("first_run", True)

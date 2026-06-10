@@ -233,6 +233,15 @@ class WhispWindow(Adw.ApplicationWindow):
         self.apply_theme()
         
         DATA_DIR.mkdir(parents=True, exist_ok=True)
+        import json
+        self.metadata = {}
+        meta_file = DATA_DIR / "metadata.json"
+        if meta_file.exists():
+            try:
+                self.metadata = json.loads(meta_file.read_text())
+            except:
+                pass
+        self._ignore_pin_toggle = False
 
         self.toolbar_view = Adw.ToolbarView()
         self.toast_overlay = Adw.ToastOverlay()
@@ -303,6 +312,12 @@ class WhispWindow(Adw.ApplicationWindow):
         del_btn.set_action_name("win.delete-note")
         del_btn.add_css_class("destructive-action")
         self.header_bar.pack_start(del_btn)
+
+        # Pin Note Button
+        self.pin_btn = Gtk.ToggleButton(icon_name="window-pin-symbolic")
+        self.pin_btn.set_tooltip_text("Pin Note")
+        self.pin_btn.connect("toggled", self.on_pin_toggled)
+        self.header_bar.pack_start(self.pin_btn)
 
         # Search Toggle Button
         self.search_btn = Gtk.MenuButton()
@@ -590,6 +605,56 @@ class WhispWindow(Adw.ApplicationWindow):
         dialog = builder.get_object("shortcuts_dialog")
         dialog.present(self)
 
+    def save_metadata(self):
+        import json
+        meta_file = DATA_DIR / "metadata.json"
+        meta_file.write_text(json.dumps(self.metadata))
+
+    def on_pin_toggled(self, btn):
+        if self._ignore_pin_toggle:
+            return
+            
+        current_page_idx = int(round(self.carousel.get_position()))
+        if current_page_idx < 0 or current_page_idx >= self.carousel.get_n_pages():
+            return
+            
+        current_page = self.carousel.get_nth_page(current_page_idx)
+        if not current_page:
+            return
+            
+        is_pinned = btn.get_active()
+        fname = current_page.file_path.name
+        
+        if fname not in self.metadata:
+            self.metadata[fname] = {}
+        self.metadata[fname]["pinned"] = is_pinned
+        self.save_metadata()
+        
+        if is_pinned:
+            self.carousel.reorder(current_page, 0)
+            self.carousel.scroll_to(current_page, True)
+            GLib.idle_add(lambda: [current_page.textview.grab_focus(), False][-1])
+        else:
+            target_pos = 0
+            current_mtime = os.path.getmtime(current_page.file_path) if current_page.file_path.exists() else 0
+            n_pages = self.carousel.get_n_pages()
+            for i in range(n_pages - 1): # Ignore empty note at end
+                p = self.carousel.get_nth_page(i)
+                if p == current_page:
+                    continue
+                p_pinned = self.metadata.get(p.file_path.name, {}).get("pinned", False)
+                if p_pinned:
+                    target_pos = i + 1
+                    continue
+                p_mtime = os.path.getmtime(p.file_path) if p.file_path.exists() else 0
+                if current_mtime < p_mtime:
+                    break
+                target_pos = i + 1
+                
+            self.carousel.reorder(current_page, target_pos)
+            self.carousel.scroll_to(current_page, True)
+            GLib.idle_add(lambda: [current_page.textview.grab_focus(), False][-1])
+
     def load_notes(self):
         is_first_run = config.get("first_run", True)
         if is_first_run:
@@ -619,26 +684,32 @@ class WhispWindow(Adw.ApplicationWindow):
         now = time.time()
         
         active_files = []
+        pinned_files = []
         for f in files:
             if not f.exists():
                 continue
+            is_pinned = self.metadata.get(f.name, {}).get("pinned", False)
+            if is_pinned:
+                pinned_files.append(f)
+                continue
+                
             if archive_days > 0:
                 age_days = (now - os.path.getmtime(f)) / (24 * 3600)
                 if age_days > archive_days:
                     continue
             active_files.append(f)
             
-        # Load up to N most recently modified active notes
         max_notes = config.get("max_carousel_size", 10)
         if max_notes > 0:
             recent_files = active_files[:max_notes]
         else:
             recent_files = active_files
         
-        if not recent_files:
+        if not recent_files and not pinned_files:
             self.add_note(grab_focus=False)
         else:
-            # Reverse back to append in chronological order so newest is at the end
+            for f in reversed(pinned_files):
+                self.add_note(f, grab_focus=False)
             for f in reversed(recent_files):
                 self.add_note(f, grab_focus=False)
         
@@ -838,6 +909,12 @@ class WhispWindow(Adw.ApplicationWindow):
         self.update_title()
         editor = carousel.get_nth_page(int(round(index)))
         if editor:
+            fname = editor.file_path.name
+            is_pinned = self.metadata.get(fname, {}).get("pinned", False)
+            self._ignore_pin_toggle = True
+            self.pin_btn.set_active(is_pinned)
+            self._ignore_pin_toggle = False
+            
             if self.popover.get_visible():
                 editor.set_search_highlight(self.search_entry.get_text())
             else:

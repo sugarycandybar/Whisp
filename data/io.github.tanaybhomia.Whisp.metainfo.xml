@@ -31,22 +31,37 @@
 
   <screenshots>
     <screenshot type="default">
-      <image>https://raw.githubusercontent.com/tanaybhomia/Whisp/main/docs/assets/hero.png</image>
+      <image>https://raw.githubusercontent.com/tanaybhomia/Whisp/main/docs/assets/1-hero.png</image>
+      <caption>A beautifully simple and clutter-free workspace</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/tanaybhomia/Whisp/main/docs/assets/theme-grid.png</image>
+      <image>https://raw.githubusercontent.com/tanaybhomia/Whisp/main/docs/assets/2-pinned-dev.png</image>
+      <caption>Pin important notes and format technical snippets with ease</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/tanaybhomia/Whisp/main/docs/assets/wysiwyg-on.png</image>
+      <image>https://raw.githubusercontent.com/tanaybhomia/Whisp/main/docs/assets/3-app-ideas.png</image>
+      <caption>Seamlessly mix numbered lists, styling, and embedded hyperlinks</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/tanaybhomia/Whisp/main/docs/assets/carousel-4.png</image>
+      <image>https://raw.githubusercontent.com/tanaybhomia/Whisp/main/docs/assets/4-formatting.png</image>
+      <caption>Rich WYSIWYG markdown support with tree-aware list hierarchy</caption>
     </screenshot>
   </screenshots>
 
   <content_rating type="oars-1.1" />
 
   <releases>
+    <release version="1.3.2" date="2026-06-10">
+      <description>
+        <p>A massive workflow update bringing note pinning, robust list management, and modernized UI!</p>
+        <ul>
+          <li>Pin Notes: You can now pin important notes to the front of the carousel so they are always exactly where you need them. Pinned notes bypass the auto-archive timer and persist across app restarts.</li>
+          <li>Tree-Aware List Reordering: Organize your thoughts effortlessly! You can now use Alt+Up/Down to dynamically reorder list items. It's fully tree-aware, meaning you can swap siblings and perfectly preserve the hierarchy and nested children.</li>
+          <li>UI Modernization: Replaced legacy dialog boxes with sleek, modern Libadwaita Alert Dialogs and updated UI assets across the application. Thank you to the community for this PR!</li>
+          <li>Bug Fix: Removed an overly aggressive check that was accidentally deleting notes if they started with the word "list".</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.3.1" date="2026-06-07">
       <description>
         <p>A major quality-of-life update focusing on organization, cleanup, and customization!</p>

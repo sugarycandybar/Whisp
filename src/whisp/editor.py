@@ -117,7 +117,158 @@ class NoteEditor(Gtk.Overlay):
                         self.handle_smart_paste()
                         return True
                         
+        if state & Gdk.ModifierType.ALT_MASK:
+            if keyval == Gdk.KEY_Up:
+                return self.move_line(-1)
+            elif keyval == Gdk.KEY_Down:
+                return self.move_line(1)
+                
         return False
+
+    def get_line_text(self, line_num):
+        if line_num < 0 or line_num >= self.buffer.get_line_count():
+            return ""
+        _, start = self.buffer.get_iter_at_line(line_num)
+        end = start.copy()
+        if not end.ends_line():
+            end.forward_to_line_end()
+        return self.buffer.get_text(start, end, False)
+
+    def move_line(self, direction):
+        """Moves current line (and its subtree if it's a list item) up (-1) or down (1)."""
+        insert_mark = self.buffer.get_insert()
+        cursor_iter = self.buffer.get_iter_at_mark(insert_mark)
+        
+        curr_line = cursor_iter.get_line()
+        curr_text = self.get_line_text(curr_line)
+        
+        list_regex = r'^(\s*)([-*+]\s+|\d+\.\s+|- \[ \]\s+|[☐☑]\s*)'
+        curr_match = re.match(list_regex, curr_text)
+        
+        if not curr_match:
+            # Normal single-line swap
+            target_line = curr_line + direction
+            if target_line < 0 or target_line >= self.buffer.get_line_count():
+                return False
+            upper_start = min(curr_line, target_line)
+            upper_end = upper_start
+            lower_start = max(curr_line, target_line)
+            lower_end = lower_start
+        else:
+            # Tree-aware swap
+            curr_indent = len(curr_match.group(1))
+            subtree_start = curr_line
+            subtree_end = curr_line
+            
+            # Find end of current subtree
+            for i in range(curr_line + 1, self.buffer.get_line_count()):
+                text = self.get_line_text(i)
+                if not text.strip():
+                    break
+                m = re.match(r'^(\s*)', text)
+                indent = len(m.group(1)) if m else 0
+                if indent > curr_indent:
+                    subtree_end = i
+                else:
+                    break
+                    
+            sibling_start = None
+            sibling_end = None
+            
+            if direction == -1:
+                # Look up for previous sibling
+                for i in range(curr_line - 1, -1, -1):
+                    text = self.get_line_text(i)
+                    if not text.strip():
+                        break
+                    m = re.match(r'^(\s*)', text)
+                    indent = len(m.group(1)) if m else 0
+                    if indent < curr_indent:
+                        break # hit parent
+                    if indent == curr_indent and re.match(list_regex, text):
+                        sibling_start = i
+                        sibling_end = curr_line - 1
+                        break
+            else:
+                # Look down for next sibling
+                for i in range(subtree_end + 1, self.buffer.get_line_count()):
+                    text = self.get_line_text(i)
+                    if not text.strip():
+                        break
+                    m = re.match(r'^(\s*)', text)
+                    indent = len(m.group(1)) if m else 0
+                    if indent < curr_indent:
+                        break # hit next parent
+                    if indent == curr_indent and re.match(list_regex, text):
+                        sibling_start = i
+                        sibling_end = i
+                        for j in range(i + 1, self.buffer.get_line_count()):
+                            t = self.get_line_text(j)
+                            if not t.strip():
+                                break
+                            m2 = re.match(r'^(\s*)', t)
+                            ind = len(m2.group(1)) if m2 else 0
+                            if ind > curr_indent:
+                                sibling_end = j
+                            else:
+                                break
+                        break
+                        
+            if sibling_start is None:
+                return False # No sibling in that direction
+                
+            if direction == -1:
+                upper_start = sibling_start
+                upper_end = sibling_end
+                lower_start = subtree_start
+                lower_end = subtree_end
+            else:
+                upper_start = subtree_start
+                upper_end = subtree_end
+                lower_start = sibling_start
+                lower_end = sibling_end
+
+        # Extract blocks
+        _, us = self.buffer.get_iter_at_line(upper_start)
+        _, ue = self.buffer.get_iter_at_line(upper_end)
+        if not ue.ends_line():
+            ue.forward_to_line_end()
+        upper_text = self.buffer.get_text(us, ue, False)
+
+        _, ls = self.buffer.get_iter_at_line(lower_start)
+        _, le = self.buffer.get_iter_at_line(lower_end)
+        if not le.ends_line():
+            le.forward_to_line_end()
+        lower_text = self.buffer.get_text(ls, le, False)
+
+        self.buffer.begin_user_action()
+        
+        _, del_start = self.buffer.get_iter_at_line(upper_start)
+        _, del_end = self.buffer.get_iter_at_line(lower_end)
+        if not del_end.ends_line():
+            del_end.forward_to_line_end()
+
+        self.buffer.delete(del_start, del_end)
+
+        _, ins = self.buffer.get_iter_at_line(upper_start)
+        self.buffer.insert(ins, lower_text + "\n" + upper_text)
+        
+        self.buffer.end_user_action()
+        
+        if direction == -1:
+            new_curr_line = curr_line - (upper_end - upper_start + 1)
+        else:
+            new_curr_line = curr_line + (lower_end - lower_start + 1)
+            
+        _, new_cursor_iter = self.buffer.get_iter_at_line(new_curr_line)
+        match = re.match(list_regex, curr_text)
+        offset = len(match.group(0)) if match else 0
+        new_cursor_iter.set_line_offset(min(offset, len(curr_text)))
+        self.buffer.place_cursor(new_cursor_iter)
+        
+        self.textview.scroll_to_mark(self.buffer.get_insert(), 0.0, False, 0.0, 0.0)
+        
+        return True
 
     def on_key_pressed_bubble(self, controller, keyval, keycode, state):
         if state & Gdk.ModifierType.CONTROL_MASK:
@@ -310,7 +461,7 @@ class NoteEditor(Gtk.Overlay):
     def is_empty(self):
         start, end = self.buffer.get_bounds()
         text = self.buffer.get_text(start, end, False).strip()
-        return len(text) == 0 or bool(re.match(r'^(#{1,6}\s*)?list(\s*[:\s].*)?$', text.lower()))
+        return len(text) == 0
 
     def is_list_note(self):
         start_iter = self.buffer.get_start_iter()

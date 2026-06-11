@@ -18,7 +18,7 @@
 </div>
 
 <div align="center">
-  <img alt="Whisp Main Interface" src="docs/assets/hero.png" style="max-width: 100%; height: auto;" />
+  <img alt="Whisp Main Interface" src="docs/assets/1-hero.png" style="max-width: 100%; height: auto;" />
 </div>
 
 

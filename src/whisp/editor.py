@@ -90,27 +90,24 @@ class NoteEditor(Gtk.Overlay):
                         print(f"Failed to open URL: {e}")
 
     def extract_url_at_iter(self, iter):
-        # Scan backwards to find the start of the link tag
-        start_iter = iter.copy()
-        while start_iter.backward_char():
-            if not start_iter.has_tag(self.highlighter.tag_link):
-                start_iter.forward_char()
-                break
+        line_start = iter.copy()
+        line_start.set_line_offset(0)
+        line_end = line_start.copy()
+        line_end.forward_to_line_end()
+        line_text = self.buffer.get_text(line_start, line_end, False)
+        
+        line_offset = iter.get_line_offset()
+        
+        # Check Markdown links [text](url)
+        for m in re.finditer(r'\[(.*?)\]\((.*?)\)', line_text):
+            if m.start(0) <= line_offset <= m.end(0):
+                return m.group(2)
                 
-        # Scan forwards to find the end of the link tag
-        end_iter = iter.copy()
-        while end_iter.forward_char():
-            if not end_iter.has_tag(self.highlighter.tag_link):
-                break
+        # Check bare URLs
+        for m in re.finditer(r'(?<!\()https?://[^\s]+', line_text):
+            if m.start(0) <= line_offset <= m.end(0):
+                return m.group(0)
                 
-        text = self.buffer.get_text(start_iter, end_iter, False)
-        # Check if it's a markdown link [text](url)
-        m = re.match(r'\[(.*?)\]\((.*?)\)', text)
-        if m:
-            return m.group(2)
-        # Check if it's a bare URL
-        if re.match(r'^https?://', text):
-            return text
         return None
 
     def on_mouse_motion(self, controller, x, y):

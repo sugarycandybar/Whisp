@@ -50,7 +50,100 @@ class NoteEditor(Gtk.Overlay):
         # Add keyboard shortcuts (Bubble phase for normal shortcuts)
         key_ctrl_bubble = Gtk.EventControllerKey()
         key_ctrl_bubble.connect("key-pressed", self.on_key_pressed_bubble)
+        key_ctrl_bubble.connect("key-released", self.on_key_released)
         self.textview.add_controller(key_ctrl_bubble)
+        # Add gesture click for link opening
+        self.click_gesture = Gtk.GestureClick()
+        self.click_gesture.set_button(Gdk.BUTTON_PRIMARY)
+        self.click_gesture.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
+        self.click_gesture.connect("pressed", self.on_click_pressed)
+        self.textview.add_controller(self.click_gesture)
+        
+        # Add motion controller for cursor
+        self.last_mouse_x = None
+        self.last_mouse_y = None
+        self.last_mouse_state = 0
+        self.cursor_pointer = Gdk.Cursor.new_from_name("pointer")
+        self.is_pointer_cursor = False
+        
+        self.motion_controller = Gtk.EventControllerMotion()
+        self.motion_controller.connect("motion", self.on_mouse_motion)
+        self.motion_controller.connect("leave", self.on_mouse_leave)
+        self.textview.add_controller(self.motion_controller)
+
+    def on_click_pressed(self, gesture, n_press, x, y):
+        state = gesture.get_current_event_state()
+        if state & Gdk.ModifierType.CONTROL_MASK:
+            window_x = int(x)
+            window_y = int(y)
+            buffer_x, buffer_y = self.textview.window_to_buffer_coords(Gtk.TextWindowType.WIDGET, window_x, window_y)
+            _, iter = self.textview.get_iter_at_location(buffer_x, buffer_y)
+            
+            if iter.has_tag(self.highlighter.tag_link):
+                url = self.extract_url_at_iter(iter)
+                if url:
+                    gesture.set_state(Gtk.EventSequenceState.CLAIMED)
+                    from gi.repository import Gio
+                    try:
+                        Gio.AppInfo.launch_default_for_uri(url, None)
+                    except Exception as e:
+                        print(f"Failed to open URL: {e}")
+
+    def extract_url_at_iter(self, iter):
+        line_start = iter.copy()
+        line_start.set_line_offset(0)
+        line_end = line_start.copy()
+        line_end.forward_to_line_end()
+        line_text = self.buffer.get_text(line_start, line_end, False)
+        
+        line_offset = iter.get_line_offset()
+        
+        # Check Markdown links [text](url)
+        for m in re.finditer(r'\[(.*?)\]\((.*?)\)', line_text):
+            if m.start(0) <= line_offset <= m.end(0):
+                return m.group(2)
+                
+        # Check bare URLs
+        for m in re.finditer(r'(?<!\()https?://[^\s]+', line_text):
+            if m.start(0) <= line_offset <= m.end(0):
+                return m.group(0)
+                
+        return None
+
+    def on_mouse_motion(self, controller, x, y):
+        self.last_mouse_x = x
+        self.last_mouse_y = y
+        self.last_mouse_state = controller.get_current_event_state()
+        self.update_cursor()
+
+    def on_mouse_leave(self, controller):
+        self.last_mouse_x = None
+        self.last_mouse_y = None
+        if self.is_pointer_cursor:
+            self.textview.set_cursor(None)
+            self.is_pointer_cursor = False
+
+    def update_cursor(self):
+        if self.last_mouse_x is None or self.last_mouse_y is None:
+            return
+            
+        is_ctrl = bool(self.last_mouse_state & Gdk.ModifierType.CONTROL_MASK)
+        should_be_pointer = False
+        
+        if is_ctrl:
+            buffer_x, buffer_y = self.textview.window_to_buffer_coords(
+                Gtk.TextWindowType.WIDGET, int(self.last_mouse_x), int(self.last_mouse_y)
+            )
+            _, iter = self.textview.get_iter_at_location(buffer_x, buffer_y)
+            if iter.has_tag(self.highlighter.tag_link):
+                should_be_pointer = True
+                
+        if should_be_pointer and not self.is_pointer_cursor:
+            self.textview.set_cursor(self.cursor_pointer)
+            self.is_pointer_cursor = True
+        elif not should_be_pointer and self.is_pointer_cursor:
+            self.textview.set_cursor(None)
+            self.is_pointer_cursor = False
 
     def on_buffer_changed(self, buffer):
         if self.save_timeout_id:
@@ -104,18 +197,18 @@ class NoteEditor(Gtk.Overlay):
                     # Return False so GTK proceeds to insert the typed character natively
                     pass
                                 
-            if state & Gdk.ModifierType.CONTROL_MASK:
-                if state & Gdk.ModifierType.SHIFT_MASK:
-                    if keyval == Gdk.KEY_v or keyval == Gdk.KEY_V:
-                        self.paste_plain_text()
-                        return True
-                    elif keyval == Gdk.KEY_l or keyval == Gdk.KEY_L:
-                        self.shorten_link()
-                        return True
-                elif not (state & (Gdk.ModifierType.SHIFT_MASK | Gdk.ModifierType.ALT_MASK)):
-                    if keyval == Gdk.KEY_v or keyval == Gdk.KEY_V:
-                        self.handle_smart_paste()
-                        return True
+        if state & Gdk.ModifierType.CONTROL_MASK:
+            if state & Gdk.ModifierType.SHIFT_MASK:
+                if keyval == Gdk.KEY_v or keyval == Gdk.KEY_V:
+                    self.paste_plain_text()
+                    return True
+            elif not (state & (Gdk.ModifierType.SHIFT_MASK | Gdk.ModifierType.ALT_MASK)):
+                if keyval == Gdk.KEY_v or keyval == Gdk.KEY_V:
+                    self.handle_smart_paste()
+                    return True
+                elif keyval == Gdk.KEY_l or keyval == Gdk.KEY_L:
+                    self.shorten_link()
+                    return True
                         
         if state & Gdk.ModifierType.ALT_MASK:
             if keyval == Gdk.KEY_Up:
@@ -270,7 +363,16 @@ class NoteEditor(Gtk.Overlay):
         
         return True
 
+    def on_key_released(self, controller, keyval, keycode, state):
+        if keyval in (Gdk.KEY_Control_L, Gdk.KEY_Control_R):
+            self.last_mouse_state &= ~Gdk.ModifierType.CONTROL_MASK
+            self.update_cursor()
+        return False
+
     def on_key_pressed_bubble(self, controller, keyval, keycode, state):
+        if keyval in (Gdk.KEY_Control_L, Gdk.KEY_Control_R):
+            self.last_mouse_state |= Gdk.ModifierType.CONTROL_MASK
+            self.update_cursor()
         if state & Gdk.ModifierType.CONTROL_MASK:
             if state & Gdk.ModifierType.SHIFT_MASK:
                 if keyval == Gdk.KEY_c or keyval == Gdk.KEY_C:

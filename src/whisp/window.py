@@ -67,6 +67,30 @@ shortcuts_xml = """
         </child>
         <child>
           <object class="AdwShortcutsItem">
+            <property name="title">First Note</property>
+            <property name="accelerator">&lt;Alt&gt;f</property>
+          </object>
+        </child>
+        <child>
+          <object class="AdwShortcutsItem">
+            <property name="title">Last Note</property>
+            <property name="accelerator">&lt;Alt&gt;l</property>
+          </object>
+        </child>
+        <child>
+          <object class="AdwShortcutsItem">
+            <property name="title">Pin Note</property>
+            <property name="accelerator">&lt;Primary&gt;&lt;Shift&gt;p</property>
+          </object>
+        </child>
+        <child>
+          <object class="AdwShortcutsItem">
+            <property name="title">Move Note to Front</property>
+            <property name="accelerator">&lt;Primary&gt;&lt;Shift&gt;m</property>
+          </object>
+        </child>
+        <child>
+          <object class="AdwShortcutsItem">
             <property name="title">Preferences</property>
             <property name="accelerator">&lt;Primary&gt;comma</property>
           </object>
@@ -99,6 +123,12 @@ shortcuts_xml = """
           <object class="AdwShortcutsItem">
             <property name="title">Paste Plain Text</property>
             <property name="accelerator">&lt;Primary&gt;&lt;Shift&gt;v</property>
+          </object>
+        </child>
+        <child>
+          <object class="AdwShortcutsItem">
+            <property name="title">Copy Entire Note</property>
+            <property name="accelerator">&lt;Primary&gt;&lt;Shift&gt;c</property>
           </object>
         </child>
         <child>

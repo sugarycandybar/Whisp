@@ -295,6 +295,26 @@ class WhispWindow(Adw.ApplicationWindow):
         search_action.connect("activate", self.on_search_shortcut)
         self.add_action(search_action)
 
+        pin_note_action = Gio.SimpleAction.new("pin-note", None)
+        pin_note_action.connect("activate", self.on_pin_note)
+        self.add_action(pin_note_action)
+
+        nav_first_action = Gio.SimpleAction.new("nav-first", None)
+        nav_first_action.connect("activate", self.on_nav_first)
+        self.add_action(nav_first_action)
+
+        nav_last_action = Gio.SimpleAction.new("nav-last", None)
+        nav_last_action.connect("activate", self.on_nav_last)
+        self.add_action(nav_last_action)
+
+        copy_note_action = Gio.SimpleAction.new("copy-note", None)
+        copy_note_action.connect("activate", self.on_copy_note)
+        self.add_action(copy_note_action)
+
+        bump_note_action = Gio.SimpleAction.new("bump-note", None)
+        bump_note_action.connect("activate", self.on_bump_note)
+        self.add_action(bump_note_action)
+
         # HeaderBar
         self.header_bar = Adw.HeaderBar()
         self.header_bar.add_css_class("flat")
@@ -429,6 +449,7 @@ class WhispWindow(Adw.ApplicationWindow):
         self.carousel.set_spacing(16)
         self.carousel.set_interactive(True)
         self.carousel.connect("page-changed", self.on_page_changed)
+        self.carousel.connect("notify::position", self.on_carousel_position_notify)
         self.toolbar_view.set_content(self.carousel)
 
         # Wheel paging is reimplemented in on_carousel_scroll; touchpad is untouched.
@@ -645,13 +666,12 @@ class WhispWindow(Adw.ApplicationWindow):
                 
                 self.toast_overlay.add_toast(Adw.Toast.new("Note Pinned to front"))
             else:
+                self.carousel.remove(current_page)
                 target_pos = 0
                 current_mtime = os.path.getmtime(current_page.file_path) if current_page.file_path.exists() else 0
                 n_pages = self.carousel.get_n_pages()
                 for i in range(n_pages - 1): # Ignore empty note at end
                     p = self.carousel.get_nth_page(i)
-                    if p == current_page:
-                        continue
                     p_pinned = self.metadata.get(p.file_path.name, {}).get("pinned", False)
                     if p_pinned:
                         target_pos = i + 1
@@ -661,7 +681,6 @@ class WhispWindow(Adw.ApplicationWindow):
                         break
                     target_pos = i + 1
                     
-                self.carousel.remove(current_page)
                 self.carousel.insert(current_page, target_pos)
                 
                 def animate_unpin():
@@ -673,8 +692,12 @@ class WhispWindow(Adw.ApplicationWindow):
                 GLib.timeout_add(50, animate_unpin)
                 
                 self.toast_overlay.add_toast(Adw.Toast.new("Note Unpinned"))
+                
         except Exception as e:
-            self.toast_overlay.add_toast(Adw.Toast.new(f"Error: {str(e)}"))
+            print("Error toggling pin:", e)
+
+    def on_pin_note(self, action=None, param=None):
+        self.pin_btn.set_active(not self.pin_btn.get_active())
 
     def load_notes(self):
         is_first_run = config.get("first_run", True)
@@ -709,6 +732,15 @@ class WhispWindow(Adw.ApplicationWindow):
         for f in files:
             if not f.exists():
                 continue
+                
+            # Clean up completely empty files on disk during startup
+            try:
+                if not f.read_text(encoding='utf-8').strip():
+                    f.unlink(missing_ok=True)
+                    continue
+            except Exception:
+                pass
+                
             is_pinned = self.metadata.get(f.name, {}).get("pinned", False)
             if is_pinned:
                 pinned_files.append(f)
@@ -793,21 +825,24 @@ class WhispWindow(Adw.ApplicationWindow):
         self.update_line_spacing()
         return editor
 
-    def ensure_empty_note_at_end(self):
-        n_pages = self.carousel.get_n_pages()
-        if n_pages == 0:
-            self.add_note(grab_focus=False)
-            return
+    def on_carousel_position_notify(self, carousel, param):
+        pos = carousel.get_position()
+        if pos == int(pos):
+            self.cleanup_abandoned_empty_notes(int(pos))
             
-        # If there are any empty notes that are NOT at the end, remove them
-        # (This fixes the "empty note at the start" bug)
-        for i in range(n_pages - 1, -1, -1):
+    def cleanup_abandoned_empty_notes(self, current_idx):
+        n_pages = self.carousel.get_n_pages()
+        for i in range(n_pages - 2, current_idx, -1):
             editor = self.carousel.get_nth_page(i)
             if editor.is_empty():
-                if i != self.carousel.get_n_pages() - 1:
-                    self.carousel.remove(editor)
-                    
-        # Check if the new last note is empty
+                try:
+                    if editor.file_path.exists():
+                        editor.file_path.unlink()
+                except:
+                    pass
+                self.carousel.remove(editor)
+
+    def ensure_empty_note_at_end(self):
         n_pages = self.carousel.get_n_pages()
         if n_pages == 0:
             self.add_note(grab_focus=False)
@@ -816,6 +851,48 @@ class WhispWindow(Adw.ApplicationWindow):
         last_editor = self.carousel.get_nth_page(n_pages - 1)
         if not last_editor.is_empty():
             self.add_note(grab_focus=False)
+
+    def on_nav_first(self, action=None, param=None):
+        n_pages = self.carousel.get_n_pages()
+        if n_pages > 0:
+            self.carousel.scroll_to(self.carousel.get_nth_page(0), True)
+
+    def on_nav_last(self, action=None, param=None):
+        n_pages = self.carousel.get_n_pages()
+        if n_pages > 0:
+            self.carousel.scroll_to(self.carousel.get_nth_page(n_pages - 1), True)
+
+    def on_copy_note(self, action=None, param=None):
+        editor = self.get_current_editor()
+        if editor:
+            start, end = editor.buffer.get_bounds()
+            text = editor.buffer.get_text(start, end, True)
+            from gi.repository import GObject
+            editor.textview.get_clipboard().set(text)
+            self.toast_overlay.add_toast(Adw.Toast.new("Note Copied"))
+
+    def on_bump_note(self, action=None, param=None):
+        editor = self.get_current_editor()
+        if editor and editor.file_path.exists():
+            import os
+            import time
+            os.utime(editor.file_path, None)
+            
+            is_pinned = self.metadata.get(editor.file_path.name, {}).get("pinned", False)
+            if not is_pinned:
+                self.carousel.remove(editor)
+                target_pos = self.carousel.get_n_pages() - 1 
+                self.carousel.insert(editor, target_pos)
+                
+                def animate_bump():
+                    self.carousel.scroll_to(editor, True)
+                    editor.textview.grab_focus()
+                    return False
+                
+                GLib.idle_add(animate_bump)
+                GLib.timeout_add(50, animate_bump)
+                    
+            self.toast_overlay.add_toast(Adw.Toast.new("Note moved to front"))
 
     def on_new_note(self, action=None, param=None):
         n_pages = self.carousel.get_n_pages()

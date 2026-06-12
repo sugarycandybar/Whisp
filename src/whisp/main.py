@@ -32,6 +32,11 @@ class WhispApp(Adw.Application):
         self.set_accels_for_action("win.nav-next", ["<Ctrl>bracketright"])
         self.set_accels_for_action("win.nav-prev", ["<Ctrl>bracketleft"])
         self.set_accels_for_action("win.search", ["<Ctrl>f"])
+        self.set_accels_for_action("win.pin-note", ["<Ctrl><Shift>p"])
+        self.set_accels_for_action("win.nav-first", ["<Alt>f"])
+        self.set_accels_for_action("win.nav-last", ["<Alt>l"])
+        self.set_accels_for_action("win.copy-note", ["<Ctrl><Shift>c"])
+        self.set_accels_for_action("win.bump-note", ["<Ctrl><Shift>m"])
         self.set_accels_for_action("win.quit", ["<Ctrl>q"])
 
         # Cohesive Background CSS

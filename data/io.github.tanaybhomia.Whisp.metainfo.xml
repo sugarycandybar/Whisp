@@ -31,19 +31,19 @@
 
   <screenshots>
     <screenshot type="default">
-      <image>https://raw.githubusercontent.com/tanaybhomia/Whisp/main/docs/assets/1-hero.png</image>
+      <image>https://raw.githubusercontent.com/tanaybhomia/Whisp/efc206caa65392a6eda0821d1952ed4d54ecf0ba/docs/assets/1-hero.png</image>
       <caption>A beautifully simple and clutter-free workspace</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/tanaybhomia/Whisp/main/docs/assets/2-pinned-dev.png</image>
+      <image>https://raw.githubusercontent.com/tanaybhomia/Whisp/efc206caa65392a6eda0821d1952ed4d54ecf0ba/docs/assets/2-pinned-dev.png</image>
       <caption>Pin important notes and format technical snippets with ease</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/tanaybhomia/Whisp/main/docs/assets/3-feature-roadmap.png</image>
+      <image>https://raw.githubusercontent.com/tanaybhomia/Whisp/efc206caa65392a6eda0821d1952ed4d54ecf0ba/docs/assets/3-feature-roadmap.png</image>
       <caption>Stay organized with tiered list management</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/tanaybhomia/Whisp/main/docs/assets/4-formatting.png</image>
+      <image>https://raw.githubusercontent.com/tanaybhomia/Whisp/efc206caa65392a6eda0821d1952ed4d54ecf0ba/docs/assets/4-formatting.png</image>
       <caption>Rich WYSIWYG markdown support with formatted links</caption>
     </screenshot>
   </screenshots>
@@ -51,6 +51,17 @@
   <content_rating type="oars-1.1" />
 
   <releases>
+    <release version="1.3.3" date="2026-06-13">
+      <description>
+        <p>A huge quality-of-life update bringing clickable links, new keyboard shortcuts, and important bug fixes!</p>
+        <ul>
+          <li>Clickable Links: You can now Ctrl+Click on any URL in your note to instantly open it in your default web browser.</li>
+          <li>Power User Shortcuts: Added new global keyboard shortcuts! You can now Pin Notes (Ctrl+Shift+P), Move Notes to Front (Ctrl+Shift+M), Copy Entire Note (Ctrl+Shift+C), and quickly jump to your First/Last note (Alt+F / Alt+L).</li>
+          <li>Shortcut Documentation: All new keybinds have been properly added and documented inside the built-in Keyboard Shortcuts help window.</li>
+          <li>Bug Fix: Fixed a logic bug that could occasionally cause accidentally deleted notes to save themselves as ghost notes.</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.3.2" date="2026-06-10">
       <description>
         <p>A massive workflow update bringing note pinning, robust list management, and modernized UI!</p>

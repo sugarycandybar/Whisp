@@ -24,10 +24,11 @@ class MarkdownHighlighter:
         self.tag_heading_plain = self.buffer.create_tag("heading_plain", foreground="#d08770", weight=Pango.Weight.BOLD)
         self.tag_hash_plain = self.buffer.create_tag("hash_plain", foreground="#4c566a", weight=Pango.Weight.BOLD)
         
-        # Bold and Italic
+        # Bold, Italic, Underline, and Strikethrough
         self.tag_bold = self.buffer.create_tag("bold", weight=Pango.Weight.BOLD)
         self.tag_italic = self.buffer.create_tag("italic", style=Pango.Style.ITALIC)
         self.tag_underline = self.buffer.create_tag("underline", underline=Pango.Underline.SINGLE)
+        self.tag_strikethrough = self.buffer.create_tag("strikethrough", strikethrough=True)
         self.tag_checkbox_checked = self.buffer.create_tag("checkbox_checked", strikethrough=True, foreground="#aaaaaa")
         self.tag_checkbox_icon = self.buffer.create_tag("checkbox_icon", weight=Pango.Weight.BOLD, foreground="#aaaaaa")
         self.tag_list_keyword = self.buffer.create_tag("list_keyword", foreground="#b48ead", weight=Pango.Weight.BOLD, pixels_below_lines=32)
@@ -177,6 +178,15 @@ class MarkdownHighlighter:
             if wysiwyg:
                 apply_invisible(m, 1, outer_match=m)
                 apply_invisible(m, 3, outer_match=m)
+            
+        # Apply strikethrough (~~text~~)
+        for m in re.finditer(r'(~~)(.*?)(~~)', text):
+            start_iter = self.buffer.get_iter_at_offset(m.start())
+            end_iter = self.buffer.get_iter_at_offset(m.end())
+            self.buffer.apply_tag(self.tag_strikethrough, start_iter, end_iter)
+            if wysiwyg:
+                apply_invisible(m, 1)
+                apply_invisible(m, 3)
             
         # Apply checkboxes (☐ or ☑)
         for m in re.finditer(r'^(\s*)([☐☑])\s*(.*)$', text, re.MULTILINE):

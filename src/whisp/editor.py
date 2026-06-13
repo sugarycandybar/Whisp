@@ -378,6 +378,9 @@ class NoteEditor(Gtk.Overlay):
                 if keyval == Gdk.KEY_c or keyval == Gdk.KEY_C:
                     self.buffer.insert_at_cursor("- [ ] ")
                     return True
+                elif keyval == Gdk.KEY_s or keyval == Gdk.KEY_S:
+                    self.wrap_text("~~", "~~", "strikethrough")
+                    return True
                     
             if keyval == Gdk.KEY_b or keyval == Gdk.KEY_B:
                 self.wrap_text("**", "**", "bold")
@@ -730,6 +733,7 @@ class NoteEditor(Gtk.Overlay):
                 text = re.sub(r'__(.*?)__', r'\1', text)
                 text = re.sub(r'(?<!_)_(.*?)_(?!_)', r'\1', text)
                 text = re.sub(r'`(.*?)`', r'\1', text)
+                text = re.sub(r'~~(.*?)~~', r'\1', text)
                 text = re.sub(r'\[(.*?)\]\(.*?\)', r'\1', text)
                 text = re.sub(r'^\s*[-*+]\s+', '', text, flags=re.MULTILINE)
                 text = re.sub(r'^\s*\d+\.\s+', '', text, flags=re.MULTILINE)

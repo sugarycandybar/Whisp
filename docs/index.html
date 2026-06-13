@@ -81,7 +81,7 @@
             
             <!-- Centered Master Image -->
             <div class="hero-image-wrapper">
-                <img src="assets/hero.png" alt="Whisp Interface" class="hero-image">
+                <img src="assets/1-hero.png" alt="Whisp Interface" class="hero-image">
             </div>
         </section>
 
@@ -134,39 +134,20 @@
                 <div class="carousel-track-container">
                     <ul class="carousel-track">
                         <li class="carousel-slide current-slide">
-                            <img src="assets/secondhero.png" alt="Main Interface" class="slide-image">
+                            <img src="assets/1-hero.png" alt="Main Interface" class="slide-image">
                             <p class="slide-caption">Main Interface</p>
                         </li>
                         <li class="carousel-slide">
-                            <div class="theme-slider-wrapper">
-                                <img src="assets/wysiwyg-off.png" alt="Markdown Source" class="slider-img">
-                                <img src="assets/wysiwyg-on.png" alt="WYSIWYG Mode" class="slider-img slider-img-overlay" id="wysiwyg-overlay">
-                                <div class="slider-line" id="wysiwyg-line"></div>
-                                <input type="range" min="0" max="100" value="50" class="slider-range" id="wysiwyg-range">
-                            </div>
+                            <img src="assets/2-pinned-dev.png" alt="WYSIWYG Mode" class="slide-image">
                             <p class="slide-caption">WYSIWYG Mode</p>
                         </li>
                         <li class="carousel-slide">
-                            <div class="theme-slider-wrapper">
-                                <img src="assets/long-url.png" alt="Long URL Paste" class="slider-img">
-                                <img src="assets/tiny-url.png" alt="TinyURL Extraction" class="slider-img slider-img-overlay" id="url-overlay">
-                                <div class="slider-line" id="url-line"></div>
-                                <input type="range" min="0" max="100" value="50" class="slider-range" id="url-range">
-                            </div>
+                            <img src="assets/3-feature-roadmap.png" alt="List Management" class="slide-image">
+                            <p class="slide-caption">List Management</p>
+                        </li>
+                        <li class="carousel-slide">
+                            <img src="assets/4-formatting.png" alt="Smart Link Extraction" class="slide-image">
                             <p class="slide-caption">Smart Link Extraction</p>
-                        </li>
-                        <li class="carousel-slide">
-                            <img src="assets/carousel-4.png" alt="Plain Text Paste" class="slide-image">
-                            <p class="slide-caption">Plain Text Paste</p>
-                        </li>
-                        <li class="carousel-slide">
-                            <div class="theme-slider-wrapper">
-                                <img src="assets/theme-grid.png" alt="Grid Theme" class="slider-img">
-                                <img src="assets/theme-dotted.png" alt="Dotted Theme" class="slider-img slider-img-overlay" id="theme-overlay">
-                                <div class="slider-line" id="theme-line"></div>
-                                <input type="range" min="0" max="100" value="50" class="slider-range" id="theme-range">
-                            </div>
-                            <p class="slide-caption">Native Paper Themes</p>
                         </li>
                     </ul>
                 </div>
@@ -174,7 +155,6 @@
             </div>
             <div class="carousel-nav">
                 <button class="carousel-indicator current-indicator"></button>
-                <button class="carousel-indicator"></button>
                 <button class="carousel-indicator"></button>
                 <button class="carousel-indicator"></button>
                 <button class="carousel-indicator"></button>
@@ -247,44 +227,6 @@
             updateDots(currentDot, targetDot);
         });
 
-        // Theme Slider Logic
-        const themeRange = document.getElementById('theme-range');
-        const themeOverlay = document.getElementById('theme-overlay');
-        const themeLine = document.getElementById('theme-line');
-
-        if (themeRange && themeOverlay && themeLine) {
-            themeRange.addEventListener('input', (e) => {
-                const val = e.target.value;
-                themeOverlay.style.clipPath = `polygon(0 0, ${val}% 0, ${val}% 100%, 0 100%)`;
-                themeLine.style.left = `${val}%`;
-            });
-        }
-
-        // WYSIWYG Slider Logic
-        const wysiwygRange = document.getElementById('wysiwyg-range');
-        const wysiwygOverlay = document.getElementById('wysiwyg-overlay');
-        const wysiwygLine = document.getElementById('wysiwyg-line');
-
-        if (wysiwygRange && wysiwygOverlay && wysiwygLine) {
-            wysiwygRange.addEventListener('input', (e) => {
-                const val = e.target.value;
-                wysiwygOverlay.style.clipPath = `polygon(0 0, ${val}% 0, ${val}% 100%, 0 100%)`;
-                wysiwygLine.style.left = `${val}%`;
-            });
-        }
-
-        // URL Slider Logic
-        const urlRange = document.getElementById('url-range');
-        const urlOverlay = document.getElementById('url-overlay');
-        const urlLine = document.getElementById('url-line');
-
-        if (urlRange && urlOverlay && urlLine) {
-            urlRange.addEventListener('input', (e) => {
-                const val = e.target.value;
-                urlOverlay.style.clipPath = `polygon(0 0, ${val}% 0, ${val}% 100%, 0 100%)`;
-                urlLine.style.left = `${val}%`;
-            });
-        }
 
         // 3D Parallax Tilt Effect for Hero Image
         const heroWrapper = document.querySelector('.hero-image-wrapper');

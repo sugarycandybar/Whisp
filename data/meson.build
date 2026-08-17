@@ -26,6 +26,28 @@ install_data('icons/io.github.tanaybhomia.Whisp-pin-symbolic.svg',
   install_dir: get_option('datadir') / 'icons/hicolor/symbolic/apps'
 )
 
+# D-Bus service files (D-Bus activation for the app and its search provider)
+configure_file(
+  input: 'io.github.tanaybhomia.Whisp.service.in',
+  output: 'io.github.tanaybhomia.Whisp.service',
+  configuration: conf_data,
+  install: true,
+  install_dir: get_option('datadir') / 'dbus-1' / 'services'
+)
+
+configure_file(
+  input: 'io.github.tanaybhomia.Whisp.SearchProvider.service.in',
+  output: 'io.github.tanaybhomia.Whisp.SearchProvider.service',
+  configuration: conf_data,
+  install: true,
+  install_dir: get_option('datadir') / 'dbus-1' / 'services'
+)
+
+# GNOME Shell search provider registration
+install_data('io.github.tanaybhomia.Whisp-search-provider.ini',
+  install_dir: get_option('datadir') / 'gnome-shell' / 'search-providers'
+)
+
 # Desktop file validation
 desktop_utils = find_program('desktop-file-validate', required: false)
 if desktop_utils.found()

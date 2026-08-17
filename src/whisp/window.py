@@ -7,7 +7,7 @@ from pathlib import Path
 from gi.repository import Gtk, Adw, Gdk, Gio, GLib, Pango
 from whisp.config import config, DATA_DIR, TRASH_DIR
 from whisp.editor import NoteEditor
-from whisp.text_search import iter_body_match_offsets
+from whisp.notes import NoteIndex
 
 try:
     locale.setlocale(locale.LC_ALL, '')
@@ -524,7 +524,7 @@ class WhispWindow(Adw.ApplicationWindow):
         self.search_entry = Gtk.SearchEntry()
         self.search_timeout_id = 0
         self._row_iter = None
-        self._note_cache = {}
+        self.note_index = NoteIndex()
         self.search_entry.connect("search-changed", self.on_search_changed)
         self.search_entry.connect("stop-search", lambda e: self.popover.popdown())
         popover_box.append(self.search_entry)
@@ -1276,7 +1276,7 @@ class WhispWindow(Adw.ApplicationWindow):
         return self.carousel.get_nth_page(idx)
 
     def on_search_shortcut(self, action, param):
-        self.popover.popup()
+        self.search_btn.set_active(True)
 
     def on_popover_visible(self, popover, param):
         if popover.get_visible():
@@ -1292,6 +1292,17 @@ class WhispWindow(Adw.ApplicationWindow):
             editor = self.get_current_editor()
             if editor:
                 editor.textview.grab_focus()
+
+    def open_search(self, terms):
+        """Open the in-app search popover, pre-filled with the given terms."""
+        if not self.get_mapped():
+            def on_map(w):
+                w.disconnect(handler_id)
+                self.open_search(terms)
+            handler_id = self.connect("map", on_map)
+            return
+        self.search_btn.set_active(True)
+        self.search_entry.set_text(terms)
 
     def _build_snippet_markup(self, content, idx, search_text):
         # Asymmetric context: keep the match near the start of the snippet so
@@ -1317,34 +1328,10 @@ class WhispWindow(Adw.ApplicationWindow):
             + GLib.markup_escape_text(after + suffix)
         )
 
-    def _load_note(self, f):
-        # Parse + lowercase once per note, reused until its mtime changes.
-        try:
-            mtime = os.path.getmtime(f)
-        except OSError:
-            return None
-        cached = self._note_cache.get(f)
-        if cached is not None and cached["mtime"] == mtime:
-            return cached
-        try:
-            content = f.read_text(encoding='utf-8')
-        except OSError:
-            return None
-        first_line = content.split('\n', 1)[0].strip()
-        title = re.sub(r'^#+\s*', '', first_line) if first_line else "New Note"
-        tags = set(re.findall(r'#(\w+)', content))
-        entry = {
-            "mtime": mtime, "content": content, "low_content": content.lower(),
-            "title": title, "tag_str": " ".join(f"#{t}" for t in tags),
-            "blank": not content.strip(),
-        }
-        self._note_cache[f] = entry
-        return entry
-
     def _iter_row_descriptors(self, files, search_text):
         # Lazy: descriptors are pulled by the page renderer, not built up front.
         for f in files:
-            entry = self._load_note(f)
+            entry = self.note_index.load(f)
             if entry is None or entry["blank"]:
                 continue
             title, tag_str, content = entry["title"], entry["tag_str"], entry["content"]
@@ -1354,7 +1341,7 @@ class WhispWindow(Adw.ApplicationWindow):
             if search_text not in entry["low_content"]:
                 continue
             n = 0
-            for idx in iter_body_match_offsets(content, search_text, entry["low_content"]):
+            for idx in self.note_index.iter_body_offsets(entry, search_text):
                 yield {
                     "file": f, "content": content, "idx": idx, "occurrence": n,
                     "search": search_text,

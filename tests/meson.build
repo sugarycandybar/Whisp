@@ -5,3 +5,9 @@ test('Test text_search.py',
   args: [join_paths(meson.current_source_dir(), 'test_text_search.py')],
   env: ['PYTHONPATH=' + join_paths(meson.project_source_root(), 'src')]
 )
+
+test('Test notes.py',
+  python,
+  args: [join_paths(meson.current_source_dir(), 'test_notes.py')],
+  env: ['PYTHONPATH=' + join_paths(meson.project_source_root(), 'src')]
+)

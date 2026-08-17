@@ -140,7 +140,16 @@ class WhispApp(Adw.Application):
             win = WhispWindow(application=self)
             win.load_notes(skip_restore=True)
             
+        search_terms = None
         for file in files:
+            uri = file.get_uri() or ""
+            if uri.startswith("whisp://"):
+                from urllib.parse import parse_qs, urlparse
+                query = parse_qs(urlparse(uri).query)
+                terms = query.get("q", [""])[0]
+                if terms:
+                    search_terms = terms
+                continue
             path = file.get_path()
             if path:
                 # Check if it's already in the carousel
@@ -167,8 +176,15 @@ class WhispApp(Adw.Application):
                         win.add_note(path)
                     
         win.present()
+        if search_terms:
+            win.open_search(search_terms)
 
 def main():
+    if '--search-provider' in sys.argv:
+        sys.argv.remove('--search-provider')
+        from whisp.search_provider import main as provider_main
+        return provider_main()
+        
     if '--dev' in sys.argv:
         sys.argv.remove('--dev')
         
